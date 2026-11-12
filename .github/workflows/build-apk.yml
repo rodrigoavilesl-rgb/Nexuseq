@@ -1,0 +1,38 @@
+name: Build APK
+
+# Se ejecuta en cada push a main y a mano desde la pestaña Actions (botón "Run workflow").
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: NexusEQ
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # El repo no trae gradlew: se instala Gradle 8.7 (el que pide el proyecto).
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: Tests unitarios
+        run: gradle :app:testDebugUnitTest --no-daemon
+
+      - name: Compilar APK debug
+        run: gradle :app:assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NexusEQ-debug-apk
+          path: NexusEQ/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
