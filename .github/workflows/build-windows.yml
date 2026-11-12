@@ -1,0 +1,33 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths: ['NexusEQ-Windows/**', '.github/workflows/build-windows.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Tests
+        run: dotnet test NexusEQ-Windows/NexusEQ.Core.Tests/NexusEQ.Core.Tests.csproj -c Release
+
+      - name: Publicar NexusEQ.exe (autocontenido)
+        run: >
+          dotnet publish NexusEQ-Windows/NexusEQ.App/NexusEQ.App.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -o out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NexusEQ-Windows
+          path: out/NexusEQ.exe
+          if-no-files-found: error
