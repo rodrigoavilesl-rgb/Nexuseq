@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import cl.nexus.eq.AppNames
 import cl.nexus.eq.Bands
 import cl.nexus.eq.EqMath
 import cl.nexus.eq.EqRepository
@@ -62,6 +63,7 @@ fun EqScreen() {
     val app by EqRepository.state.collectAsStateWithLifecycle()
     val sessions by EqRepository.sessions.collectAsStateWithLifecycle()
     val globalUnsupported by EqRepository.globalUnsupported.collectAsStateWithLifecycle()
+    val links by EqRepository.links.collectAsStateWithLifecycle()
     val eq = app.current
     val gains = EqMath.effectiveGains(eq)
     val preamp = EqMath.effectivePreamp(eq)
@@ -154,6 +156,22 @@ fun EqScreen() {
                 labelColor = if (app.globalMode && globalUnsupported) Neon.Red else Neon.Text,
             ) { on ->
                 EqRepository.update { it.copy(globalMode = on) }
+            }
+        }
+
+        /* ── Compatibilidad: qué apps se enlazaron ── */
+        if (links.isNotEmpty()) {
+            Panel {
+                Text("APPS DETECTADAS", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
+                links.values.forEach { l ->
+                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(AppNames.label(l.pkg), color = Neon.Text, fontFamily = Neon.Mono,
+                            fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        Text(if (l.ok) "ENLAZADA" else "ERROR DSP",
+                            color = if (l.ok) Neon.Lime else Neon.Red, fontFamily = Neon.Mono,
+                            fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
 

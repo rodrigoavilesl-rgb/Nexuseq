@@ -75,9 +75,14 @@ class EqService : Service() {
     private fun handleSessionIntent(intent: Intent) {
         val id = intent.getIntExtra(AudioEffect.EXTRA_AUDIO_SESSION, AudioEffect.ERROR)
         if (id <= 0) return
+        val pkg = intent.getStringExtra(AudioEffect.EXTRA_PACKAGE_NAME) ?: "desconocida"
         when (intent.action) {
-            AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION -> attach(id)
-            AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION -> detach(id)
+            AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION ->
+                EqRepository.setLink(id, AppLink(pkg, ok = attach(id)))
+            AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION -> {
+                detach(id)
+                EqRepository.setLink(id, null)
+            }
         }
     }
 
@@ -172,6 +177,7 @@ class EqService : Service() {
         engines.values.forEach { it.release() }
         engines.clear()
         EqRepository.setSessions(emptySet())
+        EqRepository.clearLinks()
         EqRepository.flush()
         super.onDestroy()
     }
@@ -195,6 +201,7 @@ class EqService : Service() {
                 i.action = AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION
                 i.putExtra(AudioEffect.EXTRA_AUDIO_SESSION,
                     it.getIntExtra(AudioEffect.EXTRA_AUDIO_SESSION, AudioEffect.ERROR))
+                i.putExtra(AudioEffect.EXTRA_PACKAGE_NAME, it.getStringExtra(AudioEffect.EXTRA_PACKAGE_NAME))
             }
             ContextCompat.startForegroundService(ctx, i)
         }

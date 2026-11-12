@@ -27,6 +27,25 @@ object Bands {
     }
 }
 
+/* ───────────── Apps de música detectadas ───────────── */
+
+/** App que abrió una sesión de audio con nosotros; ok=false si el sistema rechazó el DSP. */
+data class AppLink(val pkg: String, val ok: Boolean)
+
+object AppNames {
+    private val KNOWN = mapOf(
+        "com.spotify.music" to "Spotify",
+        "deezer.android.app" to "Deezer",
+        "com.apple.android.music" to "Apple Music",
+        "com.google.android.apps.youtube.music" to "YouTube Music",
+        "com.amazon.mp3" to "Amazon Music",
+        "com.aspiro.tidal" to "TIDAL",
+    )
+
+    /** Nombre legible sin pedir permisos de visibilidad de paquetes. */
+    fun label(pkg: String): String = KNOWN[pkg] ?: pkg
+}
+
 /* ───────────── Rutas de salida ───────────── */
 
 enum class OutputRoute(val label: String) {
@@ -140,6 +159,10 @@ object EqRepository {
     private val _sessions = MutableStateFlow<Set<Int>>(emptySet())
     val sessions: StateFlow<Set<Int>> = _sessions
 
+    /** Qué app abrió cada sesión de audio (para la pantalla de compatibilidad). No se persiste. */
+    private val _links = MutableStateFlow<Map<Int, AppLink>>(emptyMap())
+    val links: StateFlow<Map<Int, AppLink>> = _links
+
     /** El modo global (sesión 0) fue rechazado por el sistema o el fabricante. No se persiste. */
     private val _globalUnsupported = MutableStateFlow(false)
     val globalUnsupported: StateFlow<Boolean> = _globalUnsupported
@@ -186,6 +209,12 @@ object EqRepository {
     fun setRoute(r: OutputRoute) = _state.update { it.copy(route = r) }
 
     fun setSessions(ids: Set<Int>) { _sessions.value = ids }
+
+    fun setLink(session: Int, link: AppLink?) = _links.update {
+        if (link == null) it - session else it + (session to link)
+    }
+
+    fun clearLinks() { _links.value = emptyMap() }
 
     fun setGlobalUnsupported(v: Boolean) { _globalUnsupported.value = v }
 

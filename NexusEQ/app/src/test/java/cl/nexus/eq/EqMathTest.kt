@@ -94,3 +94,13 @@ class EqMathTest {
         }
     }
 }
+
+class AppNamesTest {
+    @Test
+    fun conocidas_traducen_ydesconocidas_devuelvenElPaquete() {
+        assertEquals("Spotify", AppNames.label("com.spotify.music"))
+        assertEquals("Deezer", AppNames.label("deezer.android.app"))
+        assertEquals("Apple Music", AppNames.label("com.apple.android.music"))
+        assertEquals("com.otra.app", AppNames.label("com.otra.app"))
+    }
+}
