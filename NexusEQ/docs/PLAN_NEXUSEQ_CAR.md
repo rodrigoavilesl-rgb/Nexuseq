@@ -32,6 +32,41 @@ App Android **sin hardware** para quien escucha música en el auto con el celula
 Preguntar a 5 instaladores o a grupos de audio car de Chile: "¿pagarías por una app que mide mi auto y
 arma el EQ?". Si 2-3 dicen que sí, seguir.
 
+## Línea Hi-Fi: reproductor local propio (decidido por el autor: "quiero esto", 2026-11-12)
+
+Motivación: al autor le importa el buen sonido. Es un producto distinto de NEXUS.EQ (que procesa a otras apps).
+
+### Por qué es otro producto
+- Los efectos de Android (DynamicsProcessing) corren en el mezclador del sistema a ~48 kHz: no son bit-perfect.
+- Spotify/Deezer/Apple Music no pasan por una app propia, así que el hi-res real solo existe en un reproductor propio.
+- El DAC no se "emula": su calidad es analógica. En software solo se controla lo medible
+  (EQ de corrección, filtros de remuestreo, dither, headroom, salida bit-perfect).
+
+### Alcance y fases (esfuerzo orientativo, a validar)
+1. **M0 — Reproducción local**: FLAC/ALAC/WAV con Media3, biblioteca por carpetas, MediaSession (control desde
+   el auto/Android Auto), gapless, ReplayGain. Reusar `EqMath` y la UI de telemetría.
+2. **M1 — EQ propio en float**: filtros biquad paramétricos (10 bandas + preamp + limitador) en el pipeline propio.
+3. **M2 — Salida USB bit-perfect**: probar el modo "bit-perfect" del mezclador de Android 14+ para DAC USB
+   (verificar disponibilidad y comportamiento por dispositivo); como alternativa, USB audio class directo (más trabajo).
+4. **M3 — Calidad**: remuestreador de alta calidad (fase mínima / lineal a elección), dither TPDF al bajar de
+   profundidad, medición de headroom. DSD fuera de alcance inicial.
+5. **M4 — Car mode + analizador del habitáculo** (une las dos líneas del plan).
+
+### Riesgos
+- Mercado de reproductores audiófilos ya poblado (Poweramp, USB Audio Player Pro, Neutron, apps de marca).
+  Diferenciador posible: modo auto + corrección del habitáculo + estética de telemetría.
+- Sin streaming (Spotify/Deezer/Apple Music no se integran): el usuario debe tener sus archivos.
+- Esfuerzo mayor que NEXUS.EQ: semanas a meses en solitario.
+
+### ADVERTENCIA de marketing y tienda
+Solo prometer lo que se pueda medir y demostrar ("salida bit-perfect verificada", "dither TPDF", "EQ de fase
+lineal"). No vender "emulación de DAC" ni "sonido de chip X": es publicidad engañosa y arriesga reseñas
+negativas o rechazo en Google Play.
+
+### Decisión pendiente
+Orden de trabajo: (a) cerrar NEXUS.EQ Car v1.1 (prueba con Spotify/Deezer/Apple Music + pantalla de
+compatibilidad), luego (b) M0-M1 del reproductor. Reevaluar tras validar con 5 usuarios reales.
+
 ## Pendientes técnicos (de la revisión)
 - Detectar la ruta por salida activa, no por dispositivos conectados.
 - Ícono de la app, `gradlew`/wrapper, exclusión de batería desde la app, `allowBackup=false`.
