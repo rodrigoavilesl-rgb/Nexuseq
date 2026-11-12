@@ -95,8 +95,8 @@ object EqStore {
     }
 
     fun setOutput(id: String) { if (cur != id) { cur = id; changed() } }
-    fun setLimiter(v: Boolean) { limiter = v; changed() }
-    fun setGlobal(v: Boolean) { global = v; changed() }
+    fun enableLimiter(v: Boolean) { limiter = v; changed() }
+    fun enableGlobal(v: Boolean) { global = v; changed() }
     fun addSession(id: Int) { sessions = sessions + id; changed() }
     fun removeSession(id: Int) { sessions = sessions - id; changed() }
     fun reset() = update { Profile() }

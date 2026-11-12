@@ -329,8 +329,8 @@ private fun Controls() {
             ),
         )
     }
-    ToggleRow("LIMITADOR", "−1 dBFS · protege la salida", EqStore.limiter) { EqStore.setLimiter(it) }
-    ToggleRow("MODO GLOBAL", "Experimental · sesión 0", EqStore.global) { EqStore.setGlobal(it) }
+    ToggleRow("LIMITADOR", "−1 dBFS · protege la salida", EqStore.limiter) { EqStore.enableLimiter(it) }
+    ToggleRow("MODO GLOBAL", "Experimental · sesión 0", EqStore.global) { EqStore.enableGlobal(it) }
 }
 
 @Composable
