@@ -17,6 +17,9 @@ App nativa en Kotlin y Jetpack Compose que procesa el audio de Spotify igual que
 
 Requisito: Android 9 (API 28) o superior.
 
+## Pruebas
+`./gradlew :app:testDebugUnitTest` (o desde Android Studio, clic derecho en `app/src/test`). Cubren la matemática de la curva: cortes de banda, auto-preamp, límites del bass boost e interpolación.
+
 ## Uso con Spotify
 1. Abre NEXUS.EQ una vez. Queda corriendo con una notificación fija.
 2. Reproduce algo en Spotify.
