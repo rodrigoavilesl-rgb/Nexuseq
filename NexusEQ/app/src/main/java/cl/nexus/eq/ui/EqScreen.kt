@@ -3,6 +3,7 @@ package cl.nexus.eq.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -96,13 +97,14 @@ fun EqScreen() {
     SideEffect { if (Neon.skin != skin) Neon.skin = skin }
 
     var drive by rememberSaveable { mutableStateOf(false) }
+    var settings by rememberSaveable { mutableStateOf(false) }
     var splash by rememberSaveable { mutableStateOf(true) }
     var viz by remember { mutableStateOf(false) }
 
     // Inactividad: se mide sin recomponer (un arreglo plano), y el modo gráfico entra tras N segundos.
     val lastTouch = remember { longArrayOf(System.nanoTime()) }
-    LaunchedEffect(app.vizDelay, drive, viz, splash) {
-        if (app.vizDelay <= 0 || drive || viz || splash) return@LaunchedEffect
+    LaunchedEffect(app.vizDelay, drive, settings, viz, splash) {
+        if (app.vizDelay <= 0 || drive || settings || viz || splash) return@LaunchedEffect
         lastTouch[0] = System.nanoTime()
         while (true) {
             delay(500)
@@ -126,12 +128,19 @@ fun EqScreen() {
                 }
             }
     ) {
-        if (drive) {
-            DriveScreen(app, hooked) { drive = false }
-        } else {
-            MainScreen(app, hooked, globalUnsupported, links, log,
+        // El botón Atrás del sistema vuelve al reproductor desde Conducción o Configuración.
+        BackHandler(enabled = drive || settings) {
+            drive = false
+            settings = false
+        }
+        when {
+            drive -> DriveScreen(app, hooked) { drive = false }
+            settings -> SettingsScreen(app, globalUnsupported, links, log,
+                onApply = { settings = false },
+                onPreviewViz = { settings = false; viz = true })
+            else -> MainScreen(app, hooked,
                 onDrive = { drive = true },
-                onPreviewViz = { viz = true })
+                onSettings = { settings = true })
         }
 
         if (viz && !drive) {
@@ -152,19 +161,15 @@ fun EqScreen() {
     }
 }
 
-/* ═══════════ Pantalla principal ═══════════ */
+/* ═══════════ Reproductor (pantalla principal) ═══════════ */
 
 @Composable
 private fun MainScreen(
     app: AppState,
     hooked: Int,
-    globalUnsupported: Boolean,
-    links: Map<Int, AppLink>,
-    log: List<String>,
     onDrive: () -> Unit,
-    onPreviewViz: () -> Unit,
+    onSettings: () -> Unit,
 ) {
-    val ctx = LocalContext.current
     val eq = app.current
     val layout = eq.layout
     val gains = EqMath.effectiveGains(eq)
@@ -184,8 +189,11 @@ private fun MainScreen(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 GlitchTitle("NEXUS.EQ")
-                Text("METAL · CYBER · DSP ${layout.count} BANDAS", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
+                Text("${Skins.byId(app.skinId).name} · DSP ${layout.count} BANDAS", color = Neon.Dim,
+                    fontFamily = Neon.Mono, fontSize = 10.sp, maxLines = 1)
             }
+            Chip("AJUSTES") { onSettings() }
+            Spacer(Modifier.width(8.dp))
             Chip("DRIVE") { onDrive() }
             Spacer(Modifier.width(10.dp))
             PowerButton(app.enabled) { EqRepository.update { it.copy(enabled = !it.enabled) } }
@@ -227,15 +235,8 @@ private fun MainScreen(
             ResponseCurve(gains, layout.centers, active = app.enabled, modifier = Modifier.fillMaxWidth().height(110.dp))
         }
 
-        /* ── Faders (8 / 10 / 16 / 32 bandas) ── */
+        /* ── Faders (la cantidad de bandas se elige en Ajustes) ── */
         Panel {
-            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("BANDAS", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
-                BandLayout.entries.forEach { l ->
-                    Chip("${l.count}", selected = layout == l) { EqRepository.setLayout(l) }
-                }
-            }
             if (layout.count <= 10) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     for (i in 0 until layout.count) {
@@ -279,8 +280,6 @@ private fun MainScreen(
                 }
             }
         }
-        Text("Los presets RETRO HI-FI imitan el carácter típico de equipos clásicos (cálido, neutro, loudness, en V). Son interpretaciones, no copias de ninguna marca.",
-            color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp, lineHeight = 13.sp)
 
         /* ── Preamp / Refuerzo de graves ── */
         Panel {
@@ -294,18 +293,73 @@ private fun MainScreen(
                 color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp)
         }
 
-        /* ── Aspecto: skins, acentos y esquinas ── */
+        if (hooked == 0 && !app.globalMode) {
+            Panel(border = Neon.Amber) {
+                Text("SIN SESIÓN DE AUDIO", color = Neon.Amber, fontFamily = Neon.Mono,
+                    fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "1. Reproduce música (Spotify, Deezer, YouTube Music…).\n" +
+                        "2. En esa app abre su Ecualizador (en Spotify: Configuración › Calidad del audio › Ecualizador).\n" +
+                        "3. Elige NEXUS.EQ si el sistema pregunta.",
+                    color = Neon.Text, fontFamily = Neon.Mono, fontSize = 11.sp, lineHeight = 16.sp,
+                )
+            }
+        }
+    }
+}
+
+/* ═══════════ Configuración ═══════════ */
+
+@Composable
+private fun SettingsScreen(
+    app: AppState,
+    globalUnsupported: Boolean,
+    links: Map<Int, AppLink>,
+    log: List<String>,
+    onApply: () -> Unit,
+    onPreviewViz: () -> Unit,
+) {
+    val ctx = LocalContext.current
+    val eq = app.current
+    val layout = eq.layout
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .safeDrawingPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("CONFIGURACIÓN", color = Neon.Chrome, fontFamily = Neon.Mono, fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp, letterSpacing = 2.sp)
+                Text("Los cambios se ven al instante. Pulsa APLICAR para volver al reproductor.",
+                    color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
+            }
+            Chip("APLICAR", selected = true) { onApply() }
+        }
+
+        /* ── Aspecto: skins por grupo, acentos y esquinas ── */
         Panel {
             Text("ASPECTO", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
-            Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Skins.ALL.forEach { sk ->
-                    Chip(sk.name, selected = app.skinId == sk.id) {
-                        // al elegir una skin se parte de su aspecto original
-                        EqRepository.update { it.copy(skinId = sk.id, accent1 = 0, accent2 = 0, corners = 0) }
+            Skins.GROUPS.forEach { (group, list) ->
+                Text(group, color = if (group == Skins.G_ALIEN) Neon.Magenta else Neon.Steel,
+                    fontFamily = Neon.Mono, fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    list.forEach { sk ->
+                        SkinCard(sk, selected = app.skinId == sk.id) {
+                            // al elegir una skin se parte de su aspecto original
+                            EqRepository.update { it.copy(skinId = sk.id, accent1 = 0, accent2 = 0, corners = 0) }
+                        }
                     }
                 }
             }
+            Text("Los estilos ESTILO REPRODUCTOR y ALIEN están inspirados en el aire de otros reproductores y juegos; no son copias ni usan sus marcas.",
+                color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp, lineHeight = 13.sp,
+                modifier = Modifier.padding(top = 10.dp))
             Text("ACENTO PRINCIPAL", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp,
                 modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
             SwatchRow(app.accent1) { c -> EqRepository.update { it.copy(accent1 = c) } }
@@ -321,10 +375,22 @@ private fun MainScreen(
             }
         }
 
+        /* ── Bandas del ecualizador ── */
+        Panel {
+            Text("BANDAS DEL ECUALIZADOR", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
+            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BandLayout.entries.forEach { l ->
+                    Chip("${l.count}", selected = layout == l) { EqRepository.setLayout(l) }
+                }
+            }
+            Text("Al cambiar, tu curva se adapta a la nueva cantidad (con menos bandas se pierde algo de detalle).",
+                color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp, modifier = Modifier.padding(top = 8.dp))
+        }
+
         /* ── Modo gráfico (salvapantallas animado) ── */
         Panel {
             Text("MODO GRÁFICO", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
-            Text("Entra solo tras unos segundos sin tocar la pantalla. Un toque lo cierra.",
+            Text("Entra solo tras unos segundos sin tocar la pantalla del reproductor. Un toque lo cierra.",
                 color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(0 to "APAGADO", 15 to "15 s", 30 to "30 s", 60 to "60 s").forEach { (sec, name) ->
@@ -350,8 +416,9 @@ private fun MainScreen(
                 color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp, modifier = Modifier.padding(top = 8.dp))
         }
 
-        /* ── Toggles ── */
+        /* ── Audio ── */
         Panel {
+            Text("AUDIO", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
             ToggleRow("LIMITADOR ANTI-CLIPPING", eq.limiter) { on ->
                 EqRepository.updateCurrent { it.copy(limiter = on) }
             }
@@ -365,10 +432,8 @@ private fun MainScreen(
             ) { on ->
                 EqRepository.update { it.copy(globalMode = on) }
             }
-            ToggleRow("MARAKES TESTER MODE", app.testerMode,
-                labelColor = if (app.testerMode) Neon.Red else Neon.Text) { on ->
-                EqRepository.update { it.copy(testerMode = on) }
-            }
+            Text("Perfil guardado por salida: cada dispositivo recuerda su ajuste.",
+                color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
         }
 
         /* ── Compatibilidad: qué apps se enlazaron ── */
@@ -387,12 +452,14 @@ private fun MainScreen(
             }
         }
 
-        /* ── Modo tester: reporte para compartir ── */
-        if (app.testerMode) {
-            val report = TesterReport.build(appVersion(ctx), deviceInfo(), app, links, log)
-            Panel(border = Neon.Red) {
-                Text("MARAKES TESTER MODE", color = Neon.Red, fontFamily = Neon.Mono,
-                    fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        /* ── Marakes Tester Mode ── */
+        Panel(border = if (app.testerMode) Neon.Red else null) {
+            ToggleRow("MARAKES TESTER MODE", app.testerMode,
+                labelColor = if (app.testerMode) Neon.Red else Neon.Text) { on ->
+                EqRepository.update { it.copy(testerMode = on) }
+            }
+            if (app.testerMode) {
+                val report = TesterReport.build(appVersion(ctx), deviceInfo(), app, links, log)
                 Text(report, color = Neon.Text, fontFamily = Neon.Mono, fontSize = 10.sp,
                     lineHeight = 14.sp, modifier = Modifier.padding(top = 6.dp))
                 Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -402,21 +469,9 @@ private fun MainScreen(
             }
         }
 
-        if (hooked == 0 && !app.globalMode) {
-            Panel(border = Neon.Amber) {
-                Text("SIN SESIÓN DE AUDIO", color = Neon.Amber, fontFamily = Neon.Mono,
-                    fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    "1. Reproduce música (Spotify, Deezer, YouTube Music…).\n" +
-                        "2. En esa app abre su Ecualizador (en Spotify: Configuración › Calidad del audio › Ecualizador).\n" +
-                        "3. Elige NEXUS.EQ si el sistema pregunta.",
-                    color = Neon.Text, fontFamily = Neon.Mono, fontSize = 11.sp, lineHeight = 16.sp,
-                )
-            }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            Chip("APLICAR Y VOLVER", selected = true) { onApply() }
         }
-
-        Text("Perfil guardado por salida: cada dispositivo recuerda su ajuste.",
-            color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp)
     }
 }
 
@@ -592,6 +647,36 @@ private fun Chip(text: String, selected: Boolean = false, onClick: () -> Unit) {
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Text(text, color = if (selected) Neon.Cyan else Neon.Text, fontFamily = Neon.Mono, fontSize = 11.sp, maxLines = 1)
+    }
+}
+
+/** Tarjeta de una skin: se dibuja con SUS colores para que se vea cómo queda antes de elegirla. */
+@Composable
+private fun SkinCard(sk: Skin, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .width(116.dp)
+            .clip(sk.shape(0.6f))
+            .background(sk.bg)
+            .border(if (selected) 2.dp else 1.dp, if (selected) sk.accent1 else sk.line, sk.shape(0.6f))
+            .clickable(onClick = onClick)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(sk.name, color = sk.text, fontFamily = Neon.Mono, fontWeight = FontWeight.Bold,
+            fontSize = 11.sp, maxLines = 1)
+        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            listOf(sk.accent1, sk.accent2, sk.hot, sk.ok).forEach { c ->
+                Box(Modifier.size(14.dp).clip(CircleShape).background(c))
+            }
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(CircleShape)
+                .background(Brush.horizontalGradient(listOf(sk.accent1, sk.accent2)))
+        )
     }
 }
 
