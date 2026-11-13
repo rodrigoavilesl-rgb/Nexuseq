@@ -6,6 +6,9 @@ on:
     branches: [main, 'claude/**']
   workflow_dispatch:
 
+permissions:
+  contents: write   # necesario para publicar el release de prueba
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -36,3 +39,16 @@ jobs:
           name: NexusEQ-debug-apk
           path: NexusEQ/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # Publica el APK como release "test-latest" para bajarlo directo (sin zip) desde el celular.
+      - name: Publicar APK en el release test-latest
+        if: github.ref_type == 'branch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk NexusEQ.apk
+          gh release view test-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create test-latest --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" \
+              --title "NEXUS.EQ build de prueba (última)" \
+              --notes "APK de depuración con firma fija. Descarga NexusEQ.apk e instálalo encima de la versión anterior."
+          gh release upload test-latest NexusEQ.apk --repo "$GITHUB_REPOSITORY" --clobber
