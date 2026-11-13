@@ -145,3 +145,85 @@ class PresetsAndReportTest {
         assertTrue(text.contains("sin eventos"))
     }
 }
+
+class LayoutsTest {
+    @Test
+    fun layouts_tienenTamanoCorrecto_yFrecuenciasCrecientes() {
+        assertEquals(listOf(8, 10, 16, 32), BandLayout.entries.map { it.count })
+        BandLayout.entries.forEach { l ->
+            assertEquals(l.count, l.centers.size)
+            assertEquals(l.count, l.labels.size)
+            assertEquals(l.count, l.cutoffs.size)
+            for (i in 1 until l.count) {
+                assertTrue("${l.name} centros no crecen en $i", l.centers[i] > l.centers[i - 1])
+                assertTrue("${l.name} cortes no crecen en $i", l.cutoffs[i] > l.cutoffs[i - 1])
+            }
+            for (i in 0 until l.count) assertTrue("${l.name} corte bajo el centro en $i", l.cutoffs[i] > l.centers[i])
+            assertTrue(l.cutoffs.last() <= 22000f)
+        }
+    }
+
+    @Test
+    fun forCount_resuelveLayout_yCaeEn10() {
+        assertEquals(BandLayout.B32, BandLayout.forCount(32))
+        assertEquals(BandLayout.B8, BandLayout.forCount(8))
+        assertEquals(BandLayout.B10, BandLayout.forCount(7))
+    }
+
+    @Test
+    fun bassWeight_conservaLosPesosOriginales_enLos10Centros() {
+        val expected = floatArrayOf(1f, 0.75f, 0.4f, 0.1f, 0f, 0f, 0f, 0f, 0f, 0f)
+        for (i in 0 until 10) assertEquals(expected[i], EqMath.bassWeight(Bands.CENTERS[i]), 0.001f)
+        assertEquals(1f, EqMath.bassWeight(16f), 0f)
+        assertEquals(0f, EqMath.bassWeight(20000f), 0f)
+    }
+
+    @Test
+    fun resample_identidad_y_cantidadCorrecta() {
+        val g = Presets.ALL.first { it.name == "METAL" }.gains
+        assertEquals(g, EqMath.resample(g, BandLayout.B10, BandLayout.B10))
+        BandLayout.entries.forEach { l ->
+            val r = EqMath.resample(g, BandLayout.B10, l)
+            assertEquals(l.count, r.size)
+            r.forEach { assertTrue(it in Bands.MIN_DB..Bands.MAX_DB) }
+        }
+    }
+
+    @Test
+    fun resample_planoSigueSiendoPlano_yUnaMesetaSeConserva() {
+        val flat = List(10) { 0f }
+        assertTrue(EqMath.resample(flat, BandLayout.B10, BandLayout.B32).all { it == 0f })
+        val plateau = List(10) { 6f }
+        assertTrue(EqMath.resample(plateau, BandLayout.B10, BandLayout.B16).all { it == 6f })
+    }
+
+    @Test
+    fun withLayout_cambiaLaCantidadDeBandas() {
+        val s = EqState().withLayout(BandLayout.B32)
+        assertEquals(32, s.gains.size)
+        assertEquals(BandLayout.B32, s.layout)
+        assertEquals(s, s.withLayout(BandLayout.B32))
+    }
+
+    @Test
+    fun lowBoost_reflejaElPresetBass_aunConBassBoostEnCero() {
+        val p = Presets.ALL.first { it.name == "BASS" }
+        assertEquals(6f, EqMath.lowBoost(EqState(gains = p.gains, bassBoost = 0f)), 0.01f)
+        assertEquals(14f, EqMath.lowBoost(EqState(gains = p.gains, bassBoost = 1f)), 0.01f)
+    }
+
+    @Test
+    fun lowBoost_ignoraLosAgudos() {
+        val g = List(10) { if (it == 9) 12f else 0f }
+        assertEquals(0f, EqMath.lowBoost(EqState(gains = g)), 0f)
+    }
+
+    @Test
+    fun effectiveGains_funcionaEn32Bandas() {
+        val s = EqState(gains = List(32) { 0f }, bassBoost = 1f)
+        val e = EqMath.effectiveGains(s)
+        assertEquals(32, e.size)
+        assertEquals(EqMath.BASS_MAX_DB, e[0], 0.001f)
+        assertEquals(0f, e[31], 0f)
+    }
+}

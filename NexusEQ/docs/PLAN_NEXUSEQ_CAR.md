@@ -82,6 +82,22 @@ y un MARAKES TESTER MODE (nombre del grupo de testers) para recoger feedback.
 - Los presets RETRO HI-FI son interpretaciones del carácter típico (cálido / neutro / loudness / en V),
   no reproducciones de ninguna marca.
 
+## v1.3 (2026-11-13): integra las mejoras pedidas por testers (v1.2 + v1.3)
+Origen: comentarios de Juan Carlos (hermano del autor) tras probar la v1.1.
+- **Arreglo:** el medidor BASS solo medía el deslizador "Bass boost" y parecía apagado con presets de graves.
+  Ahora el medidor se llama **GRAVES** y mide el refuerzo real (bandas ≤125 Hz + Bass boost). El deslizador pasa a
+  "Refuerzo de graves".
+- **Skins:** METAL, NEÓN, RETRO, DEPORTIVA, HIELO; acentos principal y secundario y estilo de esquinas
+  personalizables (se guardan).
+- **Pantalla de inicio animada** (ecualizador + título glitch, ~1,6 s, se salta con un toque).
+- **Modo gráfico** tras 15/30/60 s sin tocar (o apagado): estilos barras/onda/radial, énfasis graves/agudos/ambos.
+  Fase 1: sigue la curva de EQ del usuario, NO escucha el audio. Fase 2 (con el analizador, permiso de micrófono):
+  reaccionará a la música.
+- **EQ de 8, 10, 16 o 32 bandas** a elección (32 = 1/3 de octava de 16 Hz a 20 kHz). Al cambiar, las curvas se
+  remuestrean (con pérdida al bajar de bandas); el efecto DSP se recrea con la nueva cantidad.
+  Pendiente de validar en teléfonos: calidad sonora con 32 bandas (el efecto de Android las trata como cortes).
+- Pendientes: perfiles propios/por auto, analizador real, medición del habitáculo.
+
 ## Pendientes técnicos (de la revisión)
 - Detectar la ruta por salida activa, no por dispositivos conectados.
 - Ícono de la app, `gradlew`/wrapper, exclusión de batería desde la app, `allowBackup=false`.

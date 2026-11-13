@@ -34,6 +34,8 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +55,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -60,14 +64,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import cl.nexus.eq.AppLink
 import cl.nexus.eq.AppNames
 import cl.nexus.eq.AppState
+import cl.nexus.eq.BandLayout
 import cl.nexus.eq.Bands
 import cl.nexus.eq.EqMath
 import cl.nexus.eq.EqRepository
 import cl.nexus.eq.Preset
 import cl.nexus.eq.Presets
 import cl.nexus.eq.TesterReport
+import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.log10
 import kotlin.math.pow
@@ -80,13 +87,68 @@ fun EqScreen() {
     val globalUnsupported by EqRepository.globalUnsupported.collectAsStateWithLifecycle()
     val links by EqRepository.links.collectAsStateWithLifecycle()
     val log by EqRepository.log.collectAsStateWithLifecycle()
-    var drive by rememberSaveable { mutableStateOf(false) }
     val hooked = sessions.count { it != 0 }
 
-    if (drive) {
-        DriveScreen(app, hooked) { drive = false }
-    } else {
-        MainScreen(app, hooked, globalUnsupported, links, log) { drive = true }
+    // Aspecto activo: skin base + acentos y esquinas elegidos por el usuario.
+    val skin = remember(app.skinId, app.accent1, app.accent2, app.corners) {
+        Skins.resolve(app.skinId, app.accent1, app.accent2, app.corners)
+    }
+    SideEffect { if (Neon.skin != skin) Neon.skin = skin }
+
+    var drive by rememberSaveable { mutableStateOf(false) }
+    var splash by rememberSaveable { mutableStateOf(true) }
+    var viz by remember { mutableStateOf(false) }
+
+    // Inactividad: se mide sin recomponer (un arreglo plano), y el modo gráfico entra tras N segundos.
+    val lastTouch = remember { longArrayOf(System.nanoTime()) }
+    LaunchedEffect(app.vizDelay, drive, viz, splash) {
+        if (app.vizDelay <= 0 || drive || viz || splash) return@LaunchedEffect
+        lastTouch[0] = System.nanoTime()
+        while (true) {
+            delay(500)
+            if (System.nanoTime() - lastTouch[0] >= app.vizDelay * 1_000_000_000L) {
+                viz = true
+                break
+            }
+        }
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Neon.Bg)
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent(PointerEventPass.Initial)
+                        lastTouch[0] = System.nanoTime()
+                    }
+                }
+            }
+    ) {
+        if (drive) {
+            DriveScreen(app, hooked) { drive = false }
+        } else {
+            MainScreen(app, hooked, globalUnsupported, links, log,
+                onDrive = { drive = true },
+                onPreviewViz = { viz = true })
+        }
+
+        if (viz && !drive) {
+            val eq = app.current
+            GraphicModeOverlay(
+                gains = EqMath.effectiveGains(eq),
+                centers = eq.layout.centers,
+                style = app.vizStyle,
+                emphasis = app.vizEmphasis,
+                title = "${eq.presetName} · ${eq.layout.count} BANDAS",
+            ) {
+                viz = false
+                lastTouch[0] = System.nanoTime()
+            }
+        }
+
+        if (splash) SplashOverlay { splash = false }
     }
 }
 
@@ -97,20 +159,22 @@ private fun MainScreen(
     app: AppState,
     hooked: Int,
     globalUnsupported: Boolean,
-    links: Map<Int, cl.nexus.eq.AppLink>,
+    links: Map<Int, AppLink>,
     log: List<String>,
     onDrive: () -> Unit,
+    onPreviewViz: () -> Unit,
 ) {
     val ctx = LocalContext.current
     val eq = app.current
+    val layout = eq.layout
     val gains = EqMath.effectiveGains(eq)
     val preamp = EqMath.effectivePreamp(eq)
     val peak = EqMath.peakBoost(eq)
+    val low = EqMath.lowBoost(eq)
 
     Column(
         Modifier
             .fillMaxSize()
-            .background(Neon.Bg)
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -120,7 +184,7 @@ private fun MainScreen(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 GlitchTitle("NEXUS.EQ")
-                Text("METAL · CYBER · DSP 10 BANDAS", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
+                Text("METAL · CYBER · DSP ${layout.count} BANDAS", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
             }
             Chip("DRIVE") { onDrive() }
             Spacer(Modifier.width(10.dp))
@@ -140,12 +204,13 @@ private fun MainScreen(
                 if (eq.limiter) Neon.Lime else Neon.Dim, Modifier.weight(1f))
         }
 
-        /* ── Medidores ── */
+        /* ── Medidores (GRAVES mide el refuerzo real: bandas bajas + Bass boost) ── */
         Panel {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 ArcGauge("PREAMP", fmtDb(preamp), (preamp + 24f) / 30f,
                     if (preamp > 0) Neon.Red else Neon.Cyan)
-                ArcGauge("BASS", "${(eq.bassBoost * 100).roundToInt()}%", eq.bassBoost, Neon.Magenta)
+                ArcGauge("GRAVES", fmtDb(low), low / 20f,
+                    if (low > 10f) Neon.Red else Neon.Magenta)
                 ArcGauge("PICO", fmtDb(peak), peak / 20f,
                     when {
                         peak > 10f -> Neon.Red
@@ -159,23 +224,49 @@ private fun MainScreen(
         Panel {
             Text("RESPUESTA · ${eq.presetName}", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
             Spacer(Modifier.height(6.dp))
-            ResponseCurve(gains, active = app.enabled, modifier = Modifier.fillMaxWidth().height(110.dp))
+            ResponseCurve(gains, layout.centers, active = app.enabled, modifier = Modifier.fillMaxWidth().height(110.dp))
         }
 
-        /* ── Faders ── */
+        /* ── Faders (8 / 10 / 16 / 32 bandas) ── */
         Panel {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                for (i in 0 until Bands.COUNT) {
-                    BandFader(
-                        label = Bands.LABELS[i],
-                        value = eq.gains[i],
-                        onChange = { EqRepository.setBand(i, it) },
-                        modifier = Modifier.weight(1f),
-                    )
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("BANDAS", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
+                BandLayout.entries.forEach { l ->
+                    Chip("${l.count}", selected = layout == l) { EqRepository.setLayout(l) }
                 }
             }
-            Text("Doble toque en una banda = 0 dB", color = Neon.Dim, fontFamily = Neon.Mono,
-                fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
+            if (layout.count <= 10) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    for (i in 0 until layout.count) {
+                        BandFader(
+                            label = layout.labels[i],
+                            value = eq.gains[i],
+                            onChange = { EqRepository.setBand(i, it) },
+                            modifier = Modifier.weight(1f),
+                            compact = false,
+                        )
+                    }
+                }
+            } else {
+                // 16 y 32 bandas: faders más angostos con desplazamiento horizontal.
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    for (i in 0 until layout.count) {
+                        BandFader(
+                            label = layout.labels[i],
+                            value = eq.gains[i],
+                            onChange = { EqRepository.setBand(i, it) },
+                            modifier = Modifier.width(30.dp),
+                            compact = true,
+                        )
+                    }
+                }
+            }
+            Text(
+                if (layout.count <= 10) "Doble toque en una banda = 0 dB"
+                else "Desliza para ver todas las bandas · doble toque = 0 dB",
+                color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp),
+            )
         }
 
         /* ── Presets por grupo ── */
@@ -191,14 +282,72 @@ private fun MainScreen(
         Text("Los presets RETRO HI-FI imitan el carácter típico de equipos clásicos (cálido, neutro, loudness, en V). Son interpretaciones, no copias de ninguna marca.",
             color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp, lineHeight = 13.sp)
 
-        /* ── Preamp / Bass ── */
+        /* ── Preamp / Refuerzo de graves ── */
         Panel {
             LabeledSlider("PREAMP", fmtDb(eq.preampDb), eq.preampDb, -12f..6f, Neon.Cyan) { v ->
                 EqRepository.updateCurrent { it.copy(preampDb = (v * 2).roundToInt() / 2f) }
             }
-            LabeledSlider("BASS BOOST", "${(eq.bassBoost * 100).roundToInt()}%", eq.bassBoost, 0f..1f, Neon.Magenta) { v ->
+            LabeledSlider("REFUERZO DE GRAVES", "${(eq.bassBoost * 100).roundToInt()}%", eq.bassBoost, 0f..1f, Neon.Magenta) { v ->
                 EqRepository.updateCurrent { it.copy(bassBoost = v) }
             }
+            Text("Se suma a los graves de las bandas y del preset. El medidor GRAVES muestra el total.",
+                color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp)
+        }
+
+        /* ── Aspecto: skins, acentos y esquinas ── */
+        Panel {
+            Text("ASPECTO", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Skins.ALL.forEach { sk ->
+                    Chip(sk.name, selected = app.skinId == sk.id) {
+                        // al elegir una skin se parte de su aspecto original
+                        EqRepository.update { it.copy(skinId = sk.id, accent1 = 0, accent2 = 0, corners = 0) }
+                    }
+                }
+            }
+            Text("ACENTO PRINCIPAL", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp,
+                modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+            SwatchRow(app.accent1) { c -> EqRepository.update { it.copy(accent1 = c) } }
+            Text("ACENTO SECUNDARIO", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp,
+                modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+            SwatchRow(app.accent2) { c -> EqRepository.update { it.copy(accent2 = c) } }
+            Text("ESQUINAS", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp,
+                modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Chip("SEGÚN SKIN", selected = app.corners == 0) { EqRepository.update { it.copy(corners = 0) } }
+                Chip("CORTADAS", selected = app.corners == 1) { EqRepository.update { it.copy(corners = 1) } }
+                Chip("REDONDAS", selected = app.corners == 2) { EqRepository.update { it.copy(corners = 2) } }
+            }
+        }
+
+        /* ── Modo gráfico (salvapantallas animado) ── */
+        Panel {
+            Text("MODO GRÁFICO", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
+            Text("Entra solo tras unos segundos sin tocar la pantalla. Un toque lo cierra.",
+                color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(0 to "APAGADO", 15 to "15 s", 30 to "30 s", 60 to "60 s").forEach { (sec, name) ->
+                    Chip(name, selected = app.vizDelay == sec) { EqRepository.update { it.copy(vizDelay = sec) } }
+                }
+            }
+            Text("ESTILO", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp,
+                modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("BARRAS", "ONDA", "RADIAL").forEachIndexed { i, name ->
+                    Chip(name, selected = app.vizStyle == i) { EqRepository.update { it.copy(vizStyle = i) } }
+                }
+            }
+            Text("ÉNFASIS", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp,
+                modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("AMBOS", "GRAVES", "AGUDOS").forEachIndexed { i, name ->
+                    Chip(name, selected = app.vizEmphasis == i) { EqRepository.update { it.copy(vizEmphasis = i) } }
+                }
+            }
+            Row(Modifier.padding(top = 12.dp)) { Chip("PROBAR AHORA") { onPreviewViz() } }
+            Text("La animación sigue tu curva de EQ y no escucha el audio.",
+                color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp, modifier = Modifier.padding(top = 8.dp))
         }
 
         /* ── Toggles ── */
@@ -286,7 +435,6 @@ private fun DriveScreen(app: AppState, hooked: Int, onExit: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(Neon.Bg)
             .safeDrawingPadding()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -345,7 +493,7 @@ private fun DriveScreen(app: AppState, hooked: Int, onExit: () -> Unit) {
 
 /* ═══════════ Componentes ═══════════ */
 
-/** Título con aberración cromática (cyan/magenta) sobre cromo: look glitch. */
+/** Título con aberración cromática (acento 1 / acento 2) sobre cromo: look glitch. */
 @Composable
 private fun GlitchTitle(text: String) {
     Box {
@@ -443,7 +591,41 @@ private fun Chip(text: String, selected: Boolean = false, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        Text(text, color = if (selected) Neon.Cyan else Neon.Text, fontFamily = Neon.Mono, fontSize = 11.sp)
+        Text(text, color = if (selected) Neon.Cyan else Neon.Text, fontFamily = Neon.Mono, fontSize = 11.sp, maxLines = 1)
+    }
+}
+
+/** Fila de círculos de color para elegir un acento; el primero ("A") vuelve al de la skin. */
+@Composable
+private fun SwatchRow(selected: Int, onPick: (Int) -> Unit) {
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(Neon.Panel)
+                .border(if (selected == 0) 3.dp else 1.dp, if (selected == 0) Neon.Chrome else Neon.Line, CircleShape)
+                .clickable { onPick(0) },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("A", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
+        }
+        Skins.SWATCHES.forEach { c ->
+            val argb = c.toArgb()
+            val sel = selected == argb
+            Box(
+                Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(c)
+                    .border(if (sel) 3.dp else 1.dp, if (sel) Neon.Chrome else Neon.Line, CircleShape)
+                    .clickable { onPick(argb) }
+            )
+        }
     }
 }
 
@@ -483,7 +665,7 @@ private fun ToggleRow(
 
 /** Fader vertical tipo vúmetro LED. Arrastre o toque para fijar; doble toque = 0 dB. */
 @Composable
-private fun BandFader(label: String, value: Float, onChange: (Float) -> Unit, modifier: Modifier) {
+private fun BandFader(label: String, value: Float, onChange: (Float) -> Unit, modifier: Modifier, compact: Boolean) {
     val change by rememberUpdatedState(onChange)
     val range = Bands.MAX_DB - Bands.MIN_DB
     fun yToDb(y: Float, h: Float): Float {
@@ -496,10 +678,11 @@ private fun BandFader(label: String, value: Float, onChange: (Float) -> Unit, mo
         value < 0 -> Neon.Amber
         else -> Neon.Dim
     }
+    val textSize = if (compact) 8.sp else 9.sp
 
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(if (value == 0f) "0" else fmtShort(value), color = valColor,
-            fontFamily = Neon.Mono, fontSize = 9.sp)
+            fontFamily = Neon.Mono, fontSize = textSize, maxLines = 1, softWrap = false)
         Canvas(
             Modifier
                 .width(26.dp)
@@ -528,7 +711,7 @@ private fun BandFader(label: String, value: Float, onChange: (Float) -> Unit, mo
                 val top = s * (segH + gap)
                 val dbCenter = Bands.MAX_DB - (s + 0.5f) * (range / segs)
                 val lit = (value > 0 && dbCenter in 0f..value) || (value < 0 && dbCenter in value..0f)
-                // calor: cian → magenta → rojo al subir; ámbar al recortar
+                // calor: acento 1 → acento 2 → alerta al subir; aviso al recortar
                 val base = when {
                     dbCenter > 8f -> Neon.Red
                     dbCenter > 4f -> Neon.Magenta
@@ -554,13 +737,13 @@ private fun BandFader(label: String, value: Float, onChange: (Float) -> Unit, mo
                 cornerRadius = CornerRadius(3f, 3f),
             )
         }
-        Text(label, color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp)
+        Text(label, color = Neon.Dim, fontFamily = Neon.Mono, fontSize = textSize, maxLines = 1, softWrap = false)
     }
 }
 
-/** Curva de respuesta en escala log 20 Hz – 20 kHz, con glow neón. */
+/** Curva de respuesta en escala log 20 Hz – 20 kHz, con glow neón. [centers] = frecuencias de las bandas. */
 @Composable
-private fun ResponseCurve(gains: FloatArray, active: Boolean, modifier: Modifier) {
+private fun ResponseCurve(gains: FloatArray, centers: FloatArray, active: Boolean, modifier: Modifier) {
     val color = if (active) Neon.Cyan else Neon.Dim
     Canvas(modifier.clipToBounds()) {
         val fMin = log10(20f)
@@ -576,7 +759,7 @@ private fun ResponseCurve(gains: FloatArray, active: Boolean, modifier: Modifier
             drawLine(Neon.Line, Offset(0f, yOf(it)), Offset(size.width, yOf(it)), pathEffect = dash)
         }
         drawLine(Neon.Steel, Offset(0f, yOf(0f)), Offset(size.width, yOf(0f)))
-        Bands.CENTERS.forEach { f ->
+        centers.forEach { f ->
             val x = (log10(f) - fMin) / (fMax - fMin) * size.width
             drawLine(Neon.Line, Offset(x, 0f), Offset(x, size.height), pathEffect = dash)
         }
@@ -588,7 +771,7 @@ private fun ResponseCurve(gains: FloatArray, active: Boolean, modifier: Modifier
         for (i in 0..steps) {
             val x = size.width * i / steps
             val f = 10f.pow(fMin + (fMax - fMin) * i / steps)
-            val y = yOf(EqMath.curveAt(gains, f))
+            val y = yOf(EqMath.curveAt(gains, f, centers))
             if (i == 0) { line.moveTo(x, y); fill.moveTo(x, yOf(0f)); fill.lineTo(x, y) }
             else { line.lineTo(x, y); fill.lineTo(x, y) }
         }

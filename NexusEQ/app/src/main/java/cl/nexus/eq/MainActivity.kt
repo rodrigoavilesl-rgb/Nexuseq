@@ -13,7 +13,9 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
 import cl.nexus.eq.ui.EqScreen
+import cl.nexus.eq.ui.Neon
 import cl.nexus.eq.ui.NexusTheme
+import cl.nexus.eq.ui.Skins
 
 class MainActivity : ComponentActivity() {
 
@@ -25,6 +27,8 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         EqRepository.init(this)
+        // La skin se aplica antes del primer dibujo para que no parpadee con el aspecto por defecto.
+        EqRepository.state.value.let { Neon.skin = Skins.resolve(it.skinId, it.accent1, it.accent2, it.corners) }
         askNotificationPermission()
         handleIntent(intent)
         setContent { NexusTheme { EqScreen() } }

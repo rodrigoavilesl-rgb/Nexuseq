@@ -94,7 +94,7 @@ class EqService : Service() {
     private fun attach(id: Int): Boolean {
         if (id in engines) return true
         if (engines.size >= MAX_SESSIONS) return false   // el receiver está exportado: acota sesiones falsas
-        val engine = EqEngine.create(id) ?: return false
+        val engine = EqEngine.create(id, EqRepository.state.value.current.layout) ?: return false
         engines[id] = engine
         val s = EqRepository.state.value
         engine.apply(s.enabled, s.current)
@@ -120,8 +120,30 @@ class EqService : Service() {
             EqRepository.setGlobalUnsupported(false)
             if (0 in engines) detach(0)
         }
+        rebuildIfLayoutChanged(s)
         engines.values.forEach { it.apply(s.enabled, s.current) }
         updateNotification(s)
+    }
+
+    /** Al cambiar entre 8/10/16/32 bandas hay que recrear cada efecto: su cantidad de bandas es fija. */
+    private fun rebuildIfLayoutChanged(s: AppState) {
+        val layout = s.current.layout
+        var changed = false
+        engines.entries.toList().forEach { (id, engine) ->
+            if (engine.bandCount == layout.count) return@forEach
+            changed = true
+            engine.release()
+            val fresh = EqEngine.create(id, layout)
+            if (fresh != null) {
+                engines[id] = fresh
+                EqRepository.log("BANDAS ${layout.count} sesión $id: OK")
+            } else {
+                engines.remove(id)
+                EqRepository.links.value[id]?.let { EqRepository.setLink(id, it.copy(ok = false)) }
+                EqRepository.log("BANDAS ${layout.count} sesión $id: ERROR DSP")
+            }
+        }
+        if (changed) publish()
     }
 
     private fun publish() {
