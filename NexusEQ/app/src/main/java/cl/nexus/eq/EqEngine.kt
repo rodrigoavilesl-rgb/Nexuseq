@@ -64,7 +64,10 @@ class EqEngine private constructor(
     /** Ejecuta [block]; devuelve Unit si salió bien y null si falló (queda registrado). */
     private inline fun guard(what: String, block: () -> Unit): Unit? =
         runCatching(block)
-            .onFailure { Log.w(TAG, "$what falló en sesión $sessionId", it) }
+            .onFailure {
+                Log.w(TAG, "$what falló en sesión $sessionId", it)
+                EqRepository.log("DSP $what falló (sesión $sessionId): ${it.javaClass.simpleName}")
+            }
             .getOrNull()
 
     companion object {

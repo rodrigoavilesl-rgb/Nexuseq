@@ -1,5 +1,8 @@
 package cl.nexus.eq.ui
 
+import android.content.Context
+import android.content.Intent
+import android.os.Build
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,18 +13,19 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -29,8 +33,13 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,17 +51,23 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cl.nexus.eq.AppNames
+import cl.nexus.eq.AppState
 import cl.nexus.eq.Bands
 import cl.nexus.eq.EqMath
 import cl.nexus.eq.EqRepository
+import cl.nexus.eq.Preset
 import cl.nexus.eq.Presets
+import cl.nexus.eq.TesterReport
 import kotlin.math.abs
 import kotlin.math.log10
 import kotlin.math.pow
@@ -64,10 +79,33 @@ fun EqScreen() {
     val sessions by EqRepository.sessions.collectAsStateWithLifecycle()
     val globalUnsupported by EqRepository.globalUnsupported.collectAsStateWithLifecycle()
     val links by EqRepository.links.collectAsStateWithLifecycle()
+    val log by EqRepository.log.collectAsStateWithLifecycle()
+    var drive by rememberSaveable { mutableStateOf(false) }
+    val hooked = sessions.count { it != 0 }
+
+    if (drive) {
+        DriveScreen(app, hooked) { drive = false }
+    } else {
+        MainScreen(app, hooked, globalUnsupported, links, log) { drive = true }
+    }
+}
+
+/* ═══════════ Pantalla principal ═══════════ */
+
+@Composable
+private fun MainScreen(
+    app: AppState,
+    hooked: Int,
+    globalUnsupported: Boolean,
+    links: Map<Int, cl.nexus.eq.AppLink>,
+    log: List<String>,
+    onDrive: () -> Unit,
+) {
+    val ctx = LocalContext.current
     val eq = app.current
     val gains = EqMath.effectiveGains(eq)
     val preamp = EqMath.effectivePreamp(eq)
-    val hooked = sessions.count { it != 0 }
+    val peak = EqMath.peakBoost(eq)
 
     Column(
         Modifier
@@ -81,10 +119,11 @@ fun EqScreen() {
         /* ── Header ── */
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("NEXUS.EQ", color = Neon.Cyan, fontFamily = Neon.Mono,
-                    fontWeight = FontWeight.Bold, fontSize = 22.sp, letterSpacing = 3.sp)
-                Text("DSP · SPOTIFY · 10 BANDAS", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
+                GlitchTitle("NEXUS.EQ")
+                Text("METAL · CYBER · DSP 10 BANDAS", color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp)
             }
+            Chip("DRIVE") { onDrive() }
+            Spacer(Modifier.width(10.dp))
             PowerButton(app.enabled) { EqRepository.update { it.copy(enabled = !it.enabled) } }
         }
 
@@ -97,9 +136,23 @@ fun EqScreen() {
                 if (hooked > 0) Neon.Lime else Neon.Amber,
                 Modifier.weight(1f),
             )
-            StatTile("PREAMP", fmtDb(preamp), if (preamp > 0) Neon.Red else Neon.Text, Modifier.weight(1f))
             StatTile("LIMIT", if (eq.limiter) "ON" else "OFF",
                 if (eq.limiter) Neon.Lime else Neon.Dim, Modifier.weight(1f))
+        }
+
+        /* ── Medidores ── */
+        Panel {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                ArcGauge("PREAMP", fmtDb(preamp), (preamp + 24f) / 30f,
+                    if (preamp > 0) Neon.Red else Neon.Cyan)
+                ArcGauge("BASS", "${(eq.bassBoost * 100).roundToInt()}%", eq.bassBoost, Neon.Magenta)
+                ArcGauge("PICO", fmtDb(peak), peak / 20f,
+                    when {
+                        peak > 10f -> Neon.Red
+                        peak > 5f -> Neon.Amber
+                        else -> Neon.Lime
+                    })
+            }
         }
 
         /* ── Curva de respuesta ── */
@@ -125,12 +178,18 @@ fun EqScreen() {
                 fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
         }
 
-        /* ── Presets ── */
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Presets.ALL.forEach { p ->
-                Chip(p.name, selected = eq.presetName == p.name) { EqRepository.applyPreset(p) }
+        /* ── Presets por grupo ── */
+        Presets.GROUPS.forEach { (group, list) ->
+            Text(group, color = if (group == Presets.G_METAL) Neon.Red else Neon.Dim,
+                fontFamily = Neon.Mono, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                list.forEach { p: Preset ->
+                    Chip(p.name, selected = eq.presetName == p.name) { EqRepository.applyPreset(p) }
+                }
             }
         }
+        Text("Los presets RETRO HI-FI imitan el carácter típico de equipos clásicos (cálido, neutro, loudness, en V). Son interpretaciones, no copias de ninguna marca.",
+            color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp, lineHeight = 13.sp)
 
         /* ── Preamp / Bass ── */
         Panel {
@@ -157,6 +216,10 @@ fun EqScreen() {
             ) { on ->
                 EqRepository.update { it.copy(globalMode = on) }
             }
+            ToggleRow("MARAKES TESTER MODE", app.testerMode,
+                labelColor = if (app.testerMode) Neon.Red else Neon.Text) { on ->
+                EqRepository.update { it.copy(testerMode = on) }
+            }
         }
 
         /* ── Compatibilidad: qué apps se enlazaron ── */
@@ -175,13 +238,28 @@ fun EqScreen() {
             }
         }
 
+        /* ── Modo tester: reporte para compartir ── */
+        if (app.testerMode) {
+            val report = TesterReport.build(appVersion(ctx), deviceInfo(), app, links, log)
+            Panel(border = Neon.Red) {
+                Text("MARAKES TESTER MODE", color = Neon.Red, fontFamily = Neon.Mono,
+                    fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(report, color = Neon.Text, fontFamily = Neon.Mono, fontSize = 10.sp,
+                    lineHeight = 14.sp, modifier = Modifier.padding(top = 6.dp))
+                Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Chip("COMPARTIR REPORTE") { shareText(ctx, report) }
+                    Chip("BORRAR LOG") { EqRepository.clearLog() }
+                }
+            }
+        }
+
         if (hooked == 0 && !app.globalMode) {
             Panel(border = Neon.Amber) {
-                Text("SIN SESIÓN DE SPOTIFY", color = Neon.Amber, fontFamily = Neon.Mono,
+                Text("SIN SESIÓN DE AUDIO", color = Neon.Amber, fontFamily = Neon.Mono,
                     fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    "1. Dale play en Spotify.\n" +
-                        "2. Spotify › Configuración › Calidad del audio › Ecualizador.\n" +
+                    "1. Reproduce música (Spotify, Deezer, YouTube Music…).\n" +
+                        "2. En esa app abre su Ecualizador (en Spotify: Configuración › Calidad del audio › Ecualizador).\n" +
                         "3. Elige NEXUS.EQ si el sistema pregunta.",
                     color = Neon.Text, fontFamily = Neon.Mono, fontSize = 11.sp, lineHeight = 16.sp,
                 )
@@ -193,16 +271,105 @@ fun EqScreen() {
     }
 }
 
-/* ═══════════ Componentes ═══════════ */
+/* ═══════════ Modo conducción ═══════════ */
 
 @Composable
-private fun Panel(border: Color = Neon.Line, content: @Composable () -> Unit) {
+private fun DriveScreen(app: AppState, hooked: Int, onExit: () -> Unit) {
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        view.keepScreenOn = true               // la pantalla no se apaga mientras conduces
+        onDispose { view.keepScreenOn = false }
+    }
+    val eq = app.current
+    val linked = hooked > 0 || app.globalMode
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Neon.Bg)
+            .safeDrawingPadding()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("MODO CONDUCCIÓN", color = Neon.Red, fontFamily = Neon.Mono,
+                    fontWeight = FontWeight.Bold, fontSize = 18.sp, letterSpacing = 2.sp)
+                Text("${app.route.label} · ${eq.presetName} · " + (if (linked) "ENLAZADO" else "ESPERA"),
+                    color = if (linked) Neon.Lime else Neon.Amber, fontFamily = Neon.Mono, fontSize = 12.sp)
+            }
+            Chip("SALIR") { onExit() }
+        }
+
+        // Botón gigante ON/OFF
+        val c = if (app.enabled) Neon.Lime else Neon.Dim
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(110.dp)
+                .clip(Neon.Cut)
+                .background(c.copy(alpha = 0.12f))
+                .border(3.dp, c, Neon.Cut)
+                .clickable { EqRepository.update { it.copy(enabled = !it.enabled) } },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(if (app.enabled) "EQ ON" else "EQ OFF", color = c, fontFamily = Neon.Mono,
+                fontWeight = FontWeight.Bold, fontSize = 44.sp, letterSpacing = 4.sp)
+        }
+
+        // Presets grandes, 3 por fila
+        Presets.DRIVE.chunked(3).forEach { rowPresets ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                rowPresets.forEach { p ->
+                    val sel = eq.presetName == p.name
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(88.dp)
+                            .clip(Neon.Cut)
+                            .background(if (sel) Neon.Cyan.copy(alpha = 0.15f) else Neon.Panel)
+                            .border(2.dp, if (sel) Neon.Cyan else Neon.Line, Neon.Cut)
+                            .clickable { EqRepository.applyPreset(p) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(p.name, color = if (sel) Neon.Cyan else Neon.Text, fontFamily = Neon.Mono,
+                            fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    }
+                }
+                // relleno para filas incompletas
+                repeat(3 - rowPresets.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+/* ═══════════ Componentes ═══════════ */
+
+/** Título con aberración cromática (cyan/magenta) sobre cromo: look glitch. */
+@Composable
+private fun GlitchTitle(text: String) {
+    Box {
+        Text(text, color = Neon.Magenta.copy(alpha = 0.85f), fontFamily = Neon.Mono,
+            fontWeight = FontWeight.Bold, fontSize = 26.sp, letterSpacing = 3.sp,
+            modifier = Modifier.offset(x = (-1.5).dp))
+        Text(text, color = Neon.Cyan.copy(alpha = 0.85f), fontFamily = Neon.Mono,
+            fontWeight = FontWeight.Bold, fontSize = 26.sp, letterSpacing = 3.sp,
+            modifier = Modifier.offset(x = 1.5.dp))
+        Text(text, color = Neon.Chrome, fontFamily = Neon.Mono,
+            fontWeight = FontWeight.Bold, fontSize = 26.sp, letterSpacing = 3.sp)
+    }
+}
+
+@Composable
+private fun Panel(border: Color? = null, content: @Composable ColumnScope.() -> Unit) {
+    val borderBrush = if (border != null) Brush.linearGradient(listOf(border, border))
+    else Brush.linearGradient(listOf(Neon.Red.copy(alpha = 0.7f), Neon.Line, Neon.Line, Neon.Cyan.copy(alpha = 0.5f)))
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(Neon.Panel)
-            .border(1.dp, border, RoundedCornerShape(10.dp))
+            .clip(Neon.Cut)
+            .background(Brush.verticalGradient(listOf(Neon.PanelHi, Neon.Panel)))
+            .border(1.dp, borderBrush, Neon.Cut)
             .padding(12.dp)
     ) { content() }
 }
@@ -211,14 +378,40 @@ private fun Panel(border: Color = Neon.Line, content: @Composable () -> Unit) {
 private fun StatTile(label: String, value: String, color: Color, modifier: Modifier) {
     Column(
         modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(Neon.CutSmall)
             .background(Neon.Panel)
-            .border(1.dp, Neon.Line, RoundedCornerShape(8.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .border(1.dp, Neon.Line, Neon.CutSmall)
+            .padding(horizontal = 10.dp, vertical = 7.dp)
     ) {
         Text(label, color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 8.sp)
         Text(value, color = color, fontFamily = Neon.Mono, fontSize = 12.sp,
             fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+/** Medidor en arco de 270° (estilo reloj deportivo). frac en 0..1. */
+@Composable
+private fun ArcGauge(label: String, valueText: String, frac: Float, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(74.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) {
+                val stroke = 7.dp.toPx()
+                val inset = stroke / 2f
+                val arcSize = Size(size.width - stroke, size.height - stroke)
+                val topLeft = Offset(inset, inset)
+                drawArc(Neon.Line, 135f, 270f, false, topLeft, arcSize,
+                    style = Stroke(stroke, cap = StrokeCap.Round))
+                val f = frac.coerceIn(0f, 1f)
+                if (f > 0.005f) {
+                    drawArc(color.copy(alpha = 0.25f), 135f, 270f * f, false, topLeft, arcSize,
+                        style = Stroke(stroke + 5.dp.toPx(), cap = StrokeCap.Round))
+                    drawArc(color, 135f, 270f * f, false, topLeft, arcSize,
+                        style = Stroke(stroke, cap = StrokeCap.Round))
+                }
+            }
+            Text(valueText, color = color, fontFamily = Neon.Mono, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        Text(label, color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 9.sp)
     }
 }
 
@@ -227,7 +420,7 @@ private fun PowerButton(on: Boolean, onClick: () -> Unit) {
     val c = if (on) Neon.Lime else Neon.Dim
     Box(
         Modifier
-            .size(48.dp)
+            .size(50.dp)
             .clip(CircleShape)
             .background(c.copy(alpha = 0.12f))
             .border(2.dp, c, CircleShape)
@@ -240,13 +433,13 @@ private fun PowerButton(on: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
+private fun Chip(text: String, selected: Boolean = false, onClick: () -> Unit) {
     val c = if (selected) Neon.Cyan else Neon.Line
     Box(
         Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (selected) Neon.Cyan.copy(alpha = 0.12f) else Neon.Panel)
-            .border(1.dp, c, RoundedCornerShape(6.dp))
+            .clip(Neon.CutSmall)
+            .background(if (selected) Neon.Cyan.copy(alpha = 0.14f) else Neon.Panel)
+            .border(1.dp, c, Neon.CutSmall)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
@@ -298,8 +491,9 @@ private fun BandFader(label: String, value: Float, onChange: (Float) -> Unit, mo
         return ((Bands.MIN_DB + frac * range) * 2).roundToInt() / 2f
     }
     val valColor = when {
+        value > 6f -> Neon.Red
         value > 0 -> Neon.Cyan
-        value < 0 -> Neon.Magenta
+        value < 0 -> Neon.Amber
         else -> Neon.Dim
     }
 
@@ -334,10 +528,12 @@ private fun BandFader(label: String, value: Float, onChange: (Float) -> Unit, mo
                 val top = s * (segH + gap)
                 val dbCenter = Bands.MAX_DB - (s + 0.5f) * (range / segs)
                 val lit = (value > 0 && dbCenter in 0f..value) || (value < 0 && dbCenter in value..0f)
+                // calor: cian → magenta → rojo al subir; ámbar al recortar
                 val base = when {
-                    dbCenter > 6f -> Neon.Lime
+                    dbCenter > 8f -> Neon.Red
+                    dbCenter > 4f -> Neon.Magenta
                     dbCenter > 0f -> Neon.Cyan
-                    else -> Neon.Magenta
+                    else -> Neon.Amber
                 }
                 drawRoundRect(
                     color = if (lit) base else Neon.Line,
@@ -348,13 +544,13 @@ private fun BandFader(label: String, value: Float, onChange: (Float) -> Unit, mo
             }
             // línea de 0 dB
             val zeroY = size.height / 2f
-            drawLine(Neon.Dim, Offset(0f, zeroY), Offset(size.width, zeroY), strokeWidth = 1.dp.toPx())
-            // thumb
+            drawLine(Neon.Steel, Offset(0f, zeroY), Offset(size.width, zeroY), strokeWidth = 1.dp.toPx())
+            // perilla cromada
             val thumbY = (1f - (value - Bands.MIN_DB) / range) * size.height
             drawRoundRect(
-                color = Neon.Text,
-                topLeft = Offset(0f, thumbY - 2.dp.toPx()),
-                size = Size(size.width, 4.dp.toPx()),
+                brush = Brush.verticalGradient(listOf(Neon.Chrome, Neon.Steel)),
+                topLeft = Offset(0f, thumbY - 3.dp.toPx()),
+                size = Size(size.width, 6.dp.toPx()),
                 cornerRadius = CornerRadius(3f, 3f),
             )
         }
@@ -379,7 +575,7 @@ private fun ResponseCurve(gains: FloatArray, active: Boolean, modifier: Modifier
         listOf(-12f, -6f, 6f, 12f, 18f).forEach {
             drawLine(Neon.Line, Offset(0f, yOf(it)), Offset(size.width, yOf(it)), pathEffect = dash)
         }
-        drawLine(Neon.Dim, Offset(0f, yOf(0f)), Offset(size.width, yOf(0f)))
+        drawLine(Neon.Steel, Offset(0f, yOf(0f)), Offset(size.width, yOf(0f)))
         Bands.CENTERS.forEach { f ->
             val x = (log10(f) - fMin) / (fMax - fMin) * size.width
             drawLine(Neon.Line, Offset(x, 0f), Offset(x, size.height), pathEffect = dash)
@@ -404,6 +600,22 @@ private fun ResponseCurve(gains: FloatArray, active: Boolean, modifier: Modifier
     }
 }
 
+/* ═══════════ Utilidades ═══════════ */
+
 private fun fmtDb(v: Float) = (if (v > 0) "+" else "") + String.format("%.1f dB", v)
 private fun fmtShort(v: Float) = (if (v > 0) "+" else "") +
     if (abs(v % 1f) < 0.01f) v.toInt().toString() else String.format("%.1f", v)
+
+private fun appVersion(ctx: Context): String =
+    runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
+
+private fun deviceInfo(): String =
+    "${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
+
+private fun shareText(ctx: Context, text: String) {
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    ctx.startActivity(Intent.createChooser(send, "Compartir reporte").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+}

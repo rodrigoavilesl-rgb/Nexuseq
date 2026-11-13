@@ -104,3 +104,44 @@ class AppNamesTest {
         assertEquals("com.otra.app", AppNames.label("com.otra.app"))
     }
 }
+
+class PresetsAndReportTest {
+    @Test
+    fun presets_tienenGrupo_yLosDeConduccionExisten() {
+        Presets.ALL.forEach { assertTrue("${it.name} sin grupo", it.group.isNotBlank()) }
+        assertEquals(Presets.DRIVE_NAMES.size, Presets.DRIVE.size)
+        assertEquals(Presets.ALL.size, Presets.GROUPS.values.sumOf { it.size })
+        assertTrue(Presets.GROUPS.containsKey(Presets.G_METAL))
+        assertTrue(Presets.GROUPS.containsKey(Presets.G_RETRO))
+    }
+
+    @Test
+    fun presetsRetro_sonSuaves_noExtremos() {
+        Presets.GROUPS.getValue(Presets.G_RETRO).forEach { p ->
+            assertTrue("${p.name} demasiado fuerte", p.gains.maxOf { kotlin.math.abs(it) } <= 6f)
+        }
+    }
+
+    @Test
+    fun reporte_incluyeEquipo_apps_yEventos() {
+        val app = AppState()
+        val links = mapOf(
+            1 to AppLink("com.spotify.music", true),
+            2 to AppLink("deezer.android.app", false),
+        )
+        val text = TesterReport.build("1.1", "Samsung SM-A546E · Android 14 (API 34)", app, links, listOf("12:00:00 prueba"))
+        assertTrue(text.startsWith("MARAKES TESTER REPORT"))
+        assertTrue(text.contains("NEXUS.EQ v1.1"))
+        assertTrue(text.contains("Samsung SM-A546E"))
+        assertTrue(text.contains("Spotify (com.spotify.music): ENLAZADA"))
+        assertTrue(text.contains("Deezer (deezer.android.app): ERROR DSP"))
+        assertTrue(text.contains("12:00:00 prueba"))
+    }
+
+    @Test
+    fun reporte_sinApps_diceNinguna() {
+        val text = TesterReport.build("1.1", "x", AppState(), emptyMap(), emptyList())
+        assertTrue(text.contains("ninguna"))
+        assertTrue(text.contains("sin eventos"))
+    }
+}

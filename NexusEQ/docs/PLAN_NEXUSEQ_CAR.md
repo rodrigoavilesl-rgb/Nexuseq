@@ -67,6 +67,21 @@ negativas o rechazo en Google Play.
 Orden de trabajo: (a) cerrar NEXUS.EQ Car v1.1 (prueba con Spotify/Deezer/Apple Music + pantalla de
 compatibilidad), luego (b) M0-M1 del reproductor. Reevaluar tras validar con 5 usuarios reales.
 
+## Actualización v1.1 (2026-11-13): diseño metal-cyberpunk + funciones
+Pedido del autor: diseño más metalero/cyberpunk con telemetría, presets inspirados en equipos clásicos
+(estilo hi-fi retro), modo conducción, analizador de espectro, perfiles propios/por auto, medir el habitáculo
+y un MARAKES TESTER MODE (nombre del grupo de testers) para recoger feedback.
+
+- **Etapa 1 (hecha en v1.1):** tema metal-cyberpunk (esquinas cortadas, cromo, glitch en el título, medidores en arco),
+  presets en 4 grupos (METAL / CYBER / RETRO HI-FI / DÍA A DÍA), MODO CONDUCCIÓN (botones grandes, pantalla siempre
+  encendida), MARAKES TESTER MODE (reporte compartible con equipo, apps enlazadas y eventos), firma de depuración fija
+  (las próximas versiones se instalan encima; esta pide desinstalar UNA vez).
+- **Etapa 2:** perfiles propios con nombre + activación automática por Bluetooth del auto.
+- **Etapa 3:** analizador de espectro en vivo (permiso RECORD_AUDIO).
+- **Etapa 4:** medir el habitáculo con el micrófono y sugerir EQ.
+- Los presets RETRO HI-FI son interpretaciones del carácter típico (cálido / neutro / loudness / en V),
+  no reproducciones de ninguna marca.
+
 ## Pendientes técnicos (de la revisión)
 - Detectar la ruta por salida activa, no por dispositivos conectados.
 - Ícono de la app, `gradlew`/wrapper, exclusión de batería desde la app, `allowBackup=false`.

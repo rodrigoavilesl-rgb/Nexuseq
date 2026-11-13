@@ -11,8 +11,18 @@ android {
         applicationId = "cl.nexus.eq"
         minSdk = 28          // DynamicsProcessing requiere Android 9+
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
+    }
+    // Clave de depuración fija (pública a propósito): todas las compilaciones de prueba se firman igual
+    // y se instalan unas encima de otras. Para publicar en Play se usará una clave privada aparte.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {

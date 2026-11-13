@@ -89,22 +89,52 @@ data class EqState(
 
 /* ───────────── Presets (dB por banda 31 → 16K) ───────────── */
 
-data class Preset(val name: String, val gains: List<Float>)
+data class Preset(val name: String, val group: String, val gains: List<Float>)
 
+/**
+ * Presets agrupados por carácter. Los de RETRO HI-FI se inspiran en la voz típica de los equipos de
+ * antaño (cálido, neutro, loudness, en V). Son interpretaciones, NO copias de ninguna marca.
+ */
 object Presets {
-    private fun p(name: String, vararg g: Number) = Preset(name, g.map { it.toFloat() })
+    private fun p(name: String, group: String, vararg g: Number) = Preset(name, group, g.map { it.toFloat() })
+
+    const val G_METAL = "METAL"
+    const val G_CYBER = "CYBER"
+    const val G_RETRO = "RETRO HI-FI"
+    const val G_DAILY = "DÍA A DÍA"
 
     val ALL = listOf(
-        p("FLAT", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-        p("BASS", 6, 5, 4, 2, 0, 0, 0, 0, 0, 0),
-        p("METAL", 4, 3, 1, 0, -2, -1, 1, 3, 4, 3),
-        p("ROCK", 4, 3, 1, -1, -1, 0, 2, 3, 3, 2),
-        p("ELECTRO", 5, 4, 1, 0, -1, 1, 0, 1, 3, 4),
-        p("POP", -1, 1, 3, 4, 3, 0, -1, -1, 0, 1),
-        p("VOCAL", -2, -1, 0, 2, 4, 4, 3, 1, 0, -1),
-        p("CLÁSICA", 3, 2, 1, 0, 0, 0, -1, 1, 2, 3),
-        p("RUTA", 3, 2, 0, -1, -1, 0, 1, 2, 3, 2),   // compensa ruido de rodado en auto
+        p("FLAT", G_DAILY, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        // METAL: graves firmes, medios recortados, mordida en agudos
+        p("METAL", G_METAL, 4, 3, 1, 0, -2, -1, 1, 3, 4, 3),
+        p("THRASH", G_METAL, 2, 3, 1, -1, -3, -2, 1, 4, 5, 3),
+        p("DOOM", G_METAL, 6, 6, 4, 2, 0, -1, -1, 0, -1, -2),
+        p("ROCK", G_METAL, 4, 3, 1, -1, -1, 0, 2, 3, 3, 2),
+        // CYBER: sub potente y brillo sintético
+        p("ELECTRO", G_CYBER, 5, 4, 1, 0, -1, 1, 0, 1, 3, 4),
+        p("BASS", G_CYBER, 6, 5, 4, 2, 0, 0, 0, 0, 0, 0),
+        p("SYNTH", G_CYBER, 3, 3, 2, 0, -1, 0, 1, 2, 4, 4),
+        p("CLUB", G_CYBER, 5, 5, 2, 0, -2, 0, 1, 2, 2, 1),
+        // RETRO HI-FI: carácter de equipos clásicos
+        p("HI-FI 70", G_RETRO, 2, 2, 1, 0, 0, 0, 0, 1, 2, 2),
+        p("CÁLIDO", G_RETRO, 1, 2, 2, 1.5, 0.5, 0, -0.5, -1, -1.5, -2),
+        p("STUDIO", G_RETRO, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1),
+        p("LOUDNESS", G_RETRO, 5, 4, 2, 0, -0.5, 0, 0, 1, 3, 4),
+        p("V-SHAPE", G_RETRO, 4, 3, 1, -1, -2, -1, 0, 2, 3, 3),
+        p("JAZZ CLUB", G_RETRO, 2, 2, 2, 1, 0, 0, 0, 1, 1, 1),
+        // DÍA A DÍA
+        p("POP", G_DAILY, -1, 1, 3, 4, 3, 0, -1, -1, 0, 1),
+        p("VOCAL", G_DAILY, -2, -1, 0, 2, 4, 4, 3, 1, 0, -1),
+        p("CLÁSICA", G_DAILY, 3, 2, 1, 0, 0, 0, -1, 1, 2, 3),
+        p("RUTA", G_DAILY, 3, 2, 0, -1, -1, 0, 1, 2, 3, 2),   // compensa ruido de rodado en auto
     )
+
+    /** Grupos en orden de aparición, para dibujar la lista por secciones. */
+    val GROUPS: Map<String, List<Preset>> = ALL.groupBy { it.group }
+
+    /** Los que aparecen como botones grandes en el modo conducción. */
+    val DRIVE_NAMES = listOf("FLAT", "BASS", "RUTA", "METAL", "ROCK", "POP", "VOCAL", "CÁLIDO", "LOUDNESS")
+    val DRIVE: List<Preset> get() = DRIVE_NAMES.mapNotNull { n -> ALL.firstOrNull { it.name == n } }
 }
 
 /* ───────────── Matemática de la curva ───────────── */
@@ -141,6 +171,7 @@ object EqMath {
 data class AppState(
     val enabled: Boolean = true,
     val globalMode: Boolean = false,
+    val testerMode: Boolean = false,   // MARAKES TESTER MODE: muestra diagnóstico y reporte
     val route: OutputRoute = OutputRoute.SPEAKER,
     val profiles: Map<OutputRoute, EqState> = OutputRoute.entries.associateWith { EqState() },
 ) {
@@ -151,6 +182,7 @@ object EqRepository {
     private const val PREFS = "nexus_eq"
     private const val KEY = "state_v1"
     private const val SAVE_DELAY_MS = 400L
+    private const val MAX_LOG = 40
 
     private val _state = MutableStateFlow(AppState())
     val state: StateFlow<AppState> = _state
@@ -162,6 +194,17 @@ object EqRepository {
     /** Qué app abrió cada sesión de audio (para la pantalla de compatibilidad). No se persiste. */
     private val _links = MutableStateFlow<Map<Int, AppLink>>(emptyMap())
     val links: StateFlow<Map<Int, AppLink>> = _links
+
+    /** Últimos eventos (enlaces, errores del DSP, cambios de salida) para el reporte de tester. */
+    private val _log = MutableStateFlow<List<String>>(emptyList())
+    val log: StateFlow<List<String>> = _log
+
+    fun log(msg: String) {
+        val t = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+        _log.update { (it + "$t $msg").takeLast(MAX_LOG) }
+    }
+
+    fun clearLog() { _log.value = emptyList() }
 
     /** El modo global (sesión 0) fue rechazado por el sistema o el fabricante. No se persiste. */
     private val _globalUnsupported = MutableStateFlow(false)
@@ -185,6 +228,7 @@ object EqRepository {
                 _state.value = AppState(
                     enabled = o.optBoolean("enabled", true),
                     globalMode = o.optBoolean("globalMode", false),
+                    testerMode = o.optBoolean("tester", false),
                     profiles = profiles,
                 )
             }
@@ -206,7 +250,10 @@ object EqRepository {
         it.copy(gains = it.gains.toMutableList().also { g -> g[i] = db }, presetName = "CUSTOM")
     }
 
-    fun setRoute(r: OutputRoute) = _state.update { it.copy(route = r) }
+    fun setRoute(r: OutputRoute) {
+        if (_state.value.route != r) log("SALIDA → ${r.label}")
+        _state.update { it.copy(route = r) }
+    }
 
     fun setSessions(ids: Set<Int>) { _sessions.value = ids }
 
@@ -235,6 +282,7 @@ object EqRepository {
         val o = JSONObject().apply {
             put("enabled", s.enabled)
             put("globalMode", s.globalMode)
+            put("tester", s.testerMode)
             put("profiles", JSONObject().apply {
                 s.profiles.forEach { (r, eq) -> put(r.name, eq.toJson()) }
             })

@@ -77,11 +77,15 @@ class EqService : Service() {
         if (id <= 0) return
         val pkg = intent.getStringExtra(AudioEffect.EXTRA_PACKAGE_NAME) ?: "desconocida"
         when (intent.action) {
-            AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION ->
-                EqRepository.setLink(id, AppLink(pkg, ok = attach(id)))
+            AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION -> {
+                val ok = attach(id)
+                EqRepository.setLink(id, AppLink(pkg, ok))
+                EqRepository.log("ENLACE ${AppNames.label(pkg)} sesión $id: ${if (ok) "OK" else "ERROR DSP"}")
+            }
             AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION -> {
                 detach(id)
                 EqRepository.setLink(id, null)
+                EqRepository.log("CIERRE ${AppNames.label(pkg)} sesión $id")
             }
         }
     }
