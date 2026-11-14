@@ -67,6 +67,7 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border:0;border-radiu
   <footer>
     <div class="chips" id="views"></div>
     <div class="chips" id="vmode"></div>
+    <button class="chip on" id="smp" style="display:none">SAMPLES:ON</button>
     <button class="chip" id="demo">▶ DEMO</button>
     <label class="ctl">VOL <input type="range" id="vol" min="0" max="1" step=".01" value=".85"></label>
     <label class="ctl">ROOM <input type="range" id="room" min="0" max="1" step=".01" value=".6"></label>
@@ -100,28 +101,28 @@ const nap = () => new Promise(r => setTimeout(r,0));
 let toastT; function toast(s){const e=$('#toast');e.textContent=s;e.style.opacity=1;clearTimeout(toastT);toastT=setTimeout(()=>e.style.opacity=0,1400)}
 
 /* ---------- Kits ---------- */
-const KD={kick:{tune:1,dec:1,click:1},snare:{tune:1,dec:1,wire:1,wireAmt:1,crack:1},tom:{tune:1,dec:1},cym:{tune:1,bright:1,dec:1},hat:{len:1},room:.3,drive:0,thr:-16,ratio:3.2,bpm:120,swing:0};
+const KD={kick:{tune:1,dec:1,click:1},snare:{tune:1,dec:1,wire:1,wireAmt:1,crack:1},tom:{tune:1,dec:1},cym:{tune:1,bright:1,dec:1},hat:{len:1},room:.3,eq:[0,0],drive:0,thr:-16,ratio:3.2,bpm:120,swing:0};
 const mk=o=>{const k={...KD,...o};for(const x of ['kick','snare','tom','cym','hat'])k[x]={...KD[x],...(o[x]||{})};return k};
 /* patrón demo: 2 compases de 16 pasos separados por '|'. X=fuerte x=normal o=suave */
 const KITS = [
- mk({id:'ROCK',name:'STUDIO ROCK',col:{drum:'#00f0ff',cym:'#ffe600',kick:'#ff2bd6',snare:'#00ffa3'},room:.35,drive:.1,bpm:120,
+ mk({id:'ROCK',eq:[1,1],name:'STUDIO ROCK',col:{drum:'#00f0ff',cym:'#ffe600',kick:'#ff2bd6',snare:'#00ffa3'},room:.35,drive:.1,bpm:120,
   demo:{kick:'x.......x.x.....|x.......x.x.....',snare:'....x.......x...|....x.......x...',hat:'x.x.x.x.x.x.x.x.|x.x.x.x.x.x.x.x.',crash:'X...............|................',t1:'................|............x...',ft:'................|..............X.'}}),
- mk({id:'METAL',name:'METAL',col:{drum:'#ff2d2d',cym:'#ffffff',kick:'#ff8a00',snare:'#ff2bd6'},
+ mk({id:'METAL',eq:[3,2],name:'METAL',col:{drum:'#ff2d2d',cym:'#ffffff',kick:'#ff8a00',snare:'#ff2bd6'},
   kick:{tune:.88,dec:.7,click:2},snare:{tune:1.2,dec:.85,wire:1.2,wireAmt:1.2,crack:1.3},tom:{tune:.78,dec:1.1},cym:{tune:1.08,bright:1.35,dec:.85},hat:{len:.8},room:.1,drive:.45,thr:-20,ratio:4.5,bpm:150,
   demo:{kick:'xxx.xxx.xxx.xxx.|xxx.xxx.xxx.xx..',snare:'........x.......|........x.......',hat:'x.x.x.x.x.x.x.x.|x.x.x.x.x.x.x...',crash:'X...............|................',t1:'................|............x...',t2:'................|.............x..',ft:'................|..............X.'}}),
- mk({id:'THRASH',name:'THRASH',col:{drum:'#7dff00',cym:'#ffffff',kick:'#ff2b2b',snare:'#ffe600'},
+ mk({id:'THRASH',eq:[2,4],name:'THRASH',col:{drum:'#7dff00',cym:'#ffffff',kick:'#ff2b2b',snare:'#ffe600'},
   kick:{tune:.95,dec:.55,click:2.2},snare:{tune:1.4,dec:.65,wire:1.4,wireAmt:1.4,crack:1.6},tom:{tune:.9,dec:.8},cym:{tune:1.12,bright:1.5,dec:.7},hat:{len:.7},room:.06,drive:.55,thr:-22,ratio:5,bpm:190,
   demo:{kick:'x.xxx.xxx.xxx.xx|x.xxx.xxx.xxx.xx',snare:'..x...x...x...x.|..x...x...x...x.',hat:'x.x.x.x.x.x.x.x.|x.x.x.x.x.x.x.x.',crash:'X...............|X...............',t1:'................|............xx..',ft:'................|..............xx'}}),
- mk({id:'POP',name:'POP',col:{drum:'#ff5fd2',cym:'#8bf0ff',kick:'#ffd34d',snare:'#b6ff00'},
+ mk({id:'POP',eq:[2,1],name:'POP',col:{drum:'#ff5fd2',cym:'#8bf0ff',kick:'#ffd34d',snare:'#b6ff00'},
   kick:{tune:1.05,dec:.8,click:.9},snare:{tune:1.05,dec:1.3,wire:1.1,wireAmt:1.1},tom:{tune:1.05,dec:.9},cym:{bright:1.1},room:.5,drive:.05,thr:-15,ratio:3.5,bpm:105,
   demo:{kick:'x.....x...x.....|x.....x...x...x.',snare:'....x.......x...|....x.......x...',hat:'x.x.x.x.x.x.x.x.|x.x.x.x.x.x.x.x.',hatO:'..............x.|..............x.',crash:'X...............|................'}}),
- mk({id:'JAZZ',name:'JAZZ SWING',col:{drum:'#a66bff',cym:'#ffb800',kick:'#ff6b9a',snare:'#6bd6ff'},
+ mk({id:'JAZZ',eq:[1,-3],name:'JAZZ SWING',col:{drum:'#a66bff',cym:'#ffb800',kick:'#ff6b9a',snare:'#6bd6ff'},
   kick:{tune:1.35,dec:.7,click:.35},snare:{tune:1.1,dec:.8,wire:.6,wireAmt:.5,crack:.5},tom:{tune:1.3,dec:.8},cym:{tune:.94,bright:.7,dec:1.35},hat:{len:1.3},room:.55,thr:-14,ratio:2,bpm:130,swing:.33,
   demo:{ride:'x...x.x.x...x.x.|x...x.x.x...x.x.',pedal:'....x.......x...|....x.......x...',snare:'o.....o.....o...|..o.....o.....o.',kick:'o...o...o...o...|o...o...o...o...'}}),
- mk({id:'SKA',name:'SKA',col:{drum:'#ffe600',cym:'#2bff7a',kick:'#ff3b3b',snare:'#00f0ff'},
+ mk({id:'SKA',eq:[-1,1],name:'SKA',col:{drum:'#ffe600',cym:'#2bff7a',kick:'#ff3b3b',snare:'#00f0ff'},
   kick:{tune:1.15,dec:.6,click:.8},snare:{tune:1.3,dec:.55,wire:.8,wireAmt:1,crack:1.3},tom:{tune:1.15,dec:.6},cym:{bright:1.1,dec:.8},hat:{len:1.4},room:.2,drive:.1,bpm:160,
   demo:{kick:'x.......x.......|x.......x.......',snare:'....x.......x...|....x.......x...',hat:'..x...x...x...x.|..x...x...x...x.',hatO:'................|..............x.',crash:'X...............|................'}}),
- mk({id:'PUNK',name:'PUNK',col:{drum:'#ff4f00',cym:'#ffffff',kick:'#ff2bd6',snare:'#00f0ff'},
+ mk({id:'PUNK',eq:[0,3],name:'PUNK',col:{drum:'#ff4f00',cym:'#ffffff',kick:'#ff2bd6',snare:'#00f0ff'},
   kick:{tune:1,dec:.75,click:1.5},snare:{tune:1.25,dec:.9,wire:1.2,wireAmt:1.2,crack:1.5},tom:{tune:.95,dec:.8},cym:{tune:1.05,bright:1.25,dec:.9},hat:{len:.9},room:.12,drive:.35,thr:-19,ratio:4,bpm:185,
   demo:{kick:'x.....x.x.....x.|x.....x.x.....x.',snare:'....x.......x...|....x.......x...',hat:'x.x.x.x.x.x.x.x.|x.x.x.x.x.x.x.x.',crash:'X...............|X...............'}}),
  mk({id:'808',name:'808 CYBER',col:{drum:'#b6ff00',cym:'#00f0ff',kick:'#ff2bd6',snare:'#ffe600'},electro:true,
@@ -149,7 +150,7 @@ for (const [id,p] of Object.entries(PIECES)) { p.id=id; p.flash=0; p.wob=0; p.wo
 /* =====================================================================
    AUDIO
    ===================================================================== */
-let ac, master, comp, shaper, outGain, revSend, revConv, revGain, noiseBufs=[], buses={}, rr=0;
+let ac, master, comp, shaper, eqL, eqH, outGain, revSend, revConv, revGain, noiseBufs=[], buses={}, rr=0;
 const CYM = {};                       // sets de buffers pre-renderizados
 const KS = {};                        // samples de usuario: pieza -> capas
 
@@ -161,7 +162,10 @@ function initAudio(){
   comp.threshold.value=-16; comp.knee.value=12; comp.ratio.value=3.2; comp.attack.value=.003; comp.release.value=.14;
   outGain = ac.createGain(); outGain.gain.value=.85;
   shaper=ac.createWaveShaper(); shaper.oversample='2x';
-  master.connect(comp); comp.connect(shaper); shaper.connect(outGain); outGain.connect(ac.destination);
+  master.connect(comp); comp.connect(shaper);
+  eqL=ac.createBiquadFilter();eqL.type='lowshelf';eqL.frequency.value=120;
+  eqH=ac.createBiquadFilter();eqH.type='highshelf';eqH.frequency.value=6500;
+  shaper.connect(eqL);eqL.connect(eqH);eqH.connect(outGain); outGain.connect(ac.destination);
   revConv = ac.createConvolver(); revConv.buffer = mkIR(2.1,3.4);
   revGain = ac.createGain(); revGain.gain.value=.2;
   revSend = ac.createGain();
@@ -179,7 +183,7 @@ function initAudio(){
 function applyMaster(){
   if(!ac)return;comp.threshold.value=kit.thr;comp.ratio.value=kit.ratio;
   const k=1+kit.drive*9,n=1024,c=new Float32Array(n);for(let i=0;i<n;i++){const x=i/(n-1)*2-1;c[i]=Math.tanh(x*k)/Math.tanh(k)}
-  shaper.curve=c;
+  shaper.curve=c;eqL.gain.value=kit.eq[0];eqH.gain.value=kit.eq[1];
 }
 function mkNoise(sec){const b=ac.createBuffer(1,ac.sampleRate*sec|0,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=rnd()*2-1;return b}
 function mkIR(sec,decay){
@@ -308,10 +312,25 @@ function vCymbal(t,v,p,zone,dest){
   r.gn.gain.setValueAtTime(g,t);r.gn.gain.setTargetAtTime(0,t+life*.55,life*.18);
   return r;
 }
-function playSample(id,v,t,dest){
-  const L=KS[id];if(!L)return false;
-  const l=L.find(x=>v<=x.max)||L[L.length-1],b=l.bufs[l.i++%l.bufs.length];
-  const s=ac.createBufferSource();s.buffer=b;s.connect(dest);s.start(t);return true;
+function sampleKeys(p,zone,pedal){
+  if(p.id==='hat')return pedal?['hat:pedal','hat:closed','hat']:zone==='edge'?['hat:open','hat:closed','hat']:['hat:closed','hat'];
+  if(p.id==='snare'&&zone==='rim')return['snare:rim','snare'];
+  if(p.id==='ride'&&zone==='bell')return['ride:bell','ride'];
+  return[p.id];
+}
+let useSamples=true;
+function playSample(p,zone,v,pedal,t,dest){
+  if(!useSamples)return false;
+  const key=sampleKeys(p,zone,pedal).find(k=>KS[k]);if(!key)return false;
+  const L=KS[key],l=L.find(x=>v<=x.max)||L[L.length-1],b=l.bufs[l.i++%l.bufs.length];
+  const fam=p.id==='kick'?kit.kick:p.id==='snare'?kit.snare:p.kind==='drum'?kit.tom:kit.cym;
+  const rate=1+(fam.tune-1)*.6;
+  if(p.kind==='hat')chokeHat(t);
+  const s=ac.createBufferSource();s.buffer=b;s.playbackRate.value=rate;
+  const gn=ac.createGain();s.connect(gn);gn.connect(dest);s.start(t);
+  if(fam.dec<1){const life=b.duration/rate*fam.dec;gn.gain.setTargetAtTime(0,t+life*.5,life*.15)}
+  if(key==='hat:open')openHat={s,gn};
+  return true;
 }
 
 /* ---- Disparo unificado ---- */
@@ -319,7 +338,7 @@ function sound(p,zone,v,pedal){
   if(!ac)return;
   if(ac.state!=='running')ac.resume();
   const t=ac.currentTime+.001,dest=buses[p.id];
-  if(!pedal && playSample(p.id,v,t,dest))return;
+  if(playSample(p,zone,v,pedal,t,dest))return;
   switch(p.kind){
     case 'drum': if(p.id==='kick')vKick(t,v,dest);else if(p.id==='snare')vSnare(t,v,zone,dest);else vTom(t,v,p,zone,dest);break;
     case 'hat': vHat(t,v,zone,pedal,dest);break;
@@ -331,14 +350,21 @@ function sound(p,zone,v,pedal){
 /* manifest: {name, pieces:{snare:{layers:[{max:.4,files:["a.wav","b.wav"]},{max:1,files:["c.wav"]}]}}} */
 async function loadManifest(url){
   const m=await (await fetch(url)).json(),base=new URL(url,location.href);
-  for(const [id,def] of Object.entries(m.pieces||{})){
-    if(!PIECES[id])continue;KS[id]=[];
+  const ents=Object.entries(m.pieces||{}).filter(([id])=>PIECES[id.split(':')[0]]);
+  const tot=ents.reduce((a,[,d])=>a+d.layers.reduce((x,L)=>x+L.files.length,0),0);let n=0;
+  const cache={};
+  for(const [id,def] of ents){
+    KS[id]=[];
     for(const L of def.layers){const bufs=[];
-      for(const f of L.files){const ab=await (await fetch(new URL(f,base))).arrayBuffer();bufs.push(await ac.decodeAudioData(ab))}
+      for(const f of L.files){
+        const u=new URL(f,base).href;
+        if(!cache[u])cache[u]=fetch(u).then(r=>r.arrayBuffer()).then(ab=>ac.decodeAudioData(ab));
+        bufs.push(await cache[u]);$('#msg').textContent='CARGANDO SAMPLES '+(++n)+'/'+tot;$('#bar div').style.width=(n/tot*100|0)+'%';
+      }
       KS[id].push({max:L.max,bufs,i:0})}
     KS[id].sort((a,b)=>a.max-b.max);
   }
-  toast('SAMPLES: '+(m.name||url));
+  $('#smp').style.display='';toast('SAMPLES: '+(m.name||url));
 }
 
 /* =====================================================================
@@ -611,6 +637,7 @@ function demoToggle(){
   if(demoOn){if(ac.state!=='running')ac.resume();demoStep=0;demoNext=performance.now()+60;demoTick()}
 }
 $('#demo').onclick=demoToggle;
+$('#smp').onclick=()=>{useSamples=!useSamples;$('#smp').classList.toggle('on',useSamples);$('#smp').textContent='SAMPLES:'+(useSamples?'ON':'OFF')};
 
 /* loop */
 let last=performance.now();
@@ -622,8 +649,8 @@ function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;draw(now/100
   try{
     initAudio();
     await renderAll(p=>{$('#bar div').style.width=(p*100|0)+'%';$('#msg').textContent='RENDERIZANDO PLATILLOS '+(p*100|0)+'%'});
-    const q=new URLSearchParams(location.search).get('kit');
-    if(q){$('#msg').textContent='CARGANDO SAMPLES…';try{await loadManifest(q)}catch(err){toast('ERROR SAMPLES: '+err.message)}}
+    const qp=new URLSearchParams(location.search).get('kit'),q=qp||(location.protocol.startsWith('http')?'kits/muldjord/kit.json':null);
+    if(q){$('#msg').textContent='BUSCANDO SAMPLES…';try{await loadManifest(q)}catch(err){if(qp)toast('ERROR SAMPLES: '+err.message)}}
   }catch(err){$('#msg').textContent='ERROR: '+err.message;console.error(err);return}
   $('#msg').textContent='MOTOR LISTO';$('#go').style.display='block';
   window.__ready=true;
