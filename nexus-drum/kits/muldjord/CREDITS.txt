@@ -1,0 +1,4 @@
+Muldjord Kit - grabado por Lars Muldjord (www.muldjord.com), mapeo SFZ por kinwie.
+Licencia CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+Fuente: https://github.com/sfzinstruments/DrumGizmo.MuldjordKit
+Modificado: mezcla estéreo de micrófonos, recorte y reducción de capas para NEXUS//DRUM.

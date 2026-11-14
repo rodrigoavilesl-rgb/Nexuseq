@@ -158,11 +158,9 @@ function initAudio(){
   const AC = window.AudioContext || window.webkitAudioContext;
   ac = new AC({latencyHint:'interactive'});
   master = ac.createGain();
-  comp = ac.createDynamicsCompressor();
-  comp.threshold.value=-16; comp.knee.value=12; comp.ratio.value=3.2; comp.attack.value=.003; comp.release.value=.14;
   outGain = ac.createGain(); outGain.gain.value=.85;
-  shaper=ac.createWaveShaper(); shaper.oversample='2x';
-  master.connect(comp); comp.connect(shaper);
+  shaper=ac.createWaveShaper(); shaper.oversample='none';
+  master.connect(shaper);
   eqL=ac.createBiquadFilter();eqL.type='lowshelf';eqL.frequency.value=120;
   eqH=ac.createBiquadFilter();eqH.type='highshelf';eqH.frequency.value=6500;
   shaper.connect(eqL);eqL.connect(eqH);eqH.connect(outGain); outGain.connect(ac.destination);
@@ -181,8 +179,7 @@ function initAudio(){
   applyRoom(); applyMaster();
 }
 function applyMaster(){
-  if(!ac)return;comp.threshold.value=kit.thr;comp.ratio.value=kit.ratio;
-  const k=1+kit.drive*9,n=1024,c=new Float32Array(n);for(let i=0;i<n;i++){const x=i/(n-1)*2-1;c[i]=Math.tanh(x*k)/Math.tanh(k)}
+  if(!ac)return;  const k=1.15+kit.drive*9,n=1024,c=new Float32Array(n);for(let i=0;i<n;i++){const x=i/(n-1)*2-1;c[i]=Math.tanh(x*k)/Math.tanh(k)}
   shaper.curve=c;eqL.gain.value=kit.eq[0];eqH.gain.value=kit.eq[1];
 }
 function mkNoise(sec){const b=ac.createBuffer(1,ac.sampleRate*sec|0,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=rnd()*2-1;return b}
@@ -370,7 +367,7 @@ async function loadManifest(url){
 /* =====================================================================
    ESCENA 3D (proyección propia en canvas)
    ===================================================================== */
-const cv=$('#stage'),g2=cv.getContext('2d');
+const cv=$('#stage'),g2=cv.getContext('2d',{alpha:false,desynchronized:true});
 let W=0,H=0,dpr=1;
 const cam={yaw:0,pitch:.62,D:240,tx:0,ty:50,tz:-30};
 const camT={yaw:0,pitch:.62,anim:false};
@@ -477,7 +474,7 @@ function draw(time,dt){
     gr.addColorStop(0,rgba(col,.12+.6*f,metal?.7:.5));gr.addColorStop(.7,rgba(col,.05+.3*f,.25));gr.addColorStop(1,rgba(col,.2+.4*f,.35));
     g2.beginPath();T.forEach((q,i)=>i?g2.lineTo(...q):g2.moveTo(...q));g2.closePath();
     g2.fillStyle=metal?'#0a0d1a':'#070a14';g2.fill();g2.fillStyle=gr;g2.fill();
-    g2.save();g2.shadowColor=col;g2.shadowBlur=6+30*f;g2.strokeStyle=col;g2.lineWidth=1.6+2*f;g2.stroke();g2.restore();
+    if(f>.03){g2.save();g2.shadowColor=col;g2.shadowBlur=6+30*f;g2.strokeStyle=col;g2.lineWidth=1.6+2*f;g2.stroke();g2.restore()}else{g2.strokeStyle=col;g2.lineWidth=1.6;g2.stroke()}
     // anillos de zona
     const ringK=metal?(p.kind==='hat'?[.78]:[.28,.78]):[.78];
     g2.strokeStyle=rgba(col,.28);g2.lineWidth=1;
@@ -551,8 +548,9 @@ function trigger(p,zone,v,pedal){
   p.flash=1;
   if(p.kind==='cymbal'||p.kind==='hat'){p.wob=v;p.wobT=performance.now()/1000}
   hits.push({p,t:performance.now()/1000,v:.4+.6*v});
-  hud(p,v);
+  hudQ.push(v);if(!hudQ.t)hudQ.t=requestAnimationFrame(()=>{for(const x of hudQ)hud(null,x);hudQ.length=0;hudQ.t=0});
 }
+const hudQ=[];
 
 const orbit={id:null,x:0,y:0};
 cv.addEventListener('pointerdown',e=>{
@@ -655,7 +653,14 @@ function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;draw(now/100
   $('#msg').textContent='MOTOR LISTO';$('#go').style.display='block';
   window.__ready=true;
   requestAnimationFrame(frame);
-  $('#go').onclick=async()=>{await ac.resume();$('#boot').style.display='none';updLat();setInterval(updLat,2000)};
+  $('#go').onclick=async()=>{
+    await ac.resume();$('#boot').style.display='none';updLat();setInterval(updLat,2000);
+    // precalentar: dispara cada voz en silencio para compilar rutas de audio y evitar el tirón del primer golpe
+    const g0=outGain.gain.value;outGain.gain.value=0;
+    for(const id of ORDER){const p=PIECES[id];for(const z of (p.kind==='drum'?['head','rim']:p.kind==='hat'?['bow','edge']:['bow','bell','edge']))sound(p,z,.5,false)}
+    sound(PIECES.hat,'bow',.5,true);
+    setTimeout(()=>{outGain.gain.value=g0},350);
+  };
 })();
 </script>
 </body>
