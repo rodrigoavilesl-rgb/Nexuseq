@@ -67,6 +67,7 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border:0;border-radiu
   <footer>
     <div class="chips" id="views"></div>
     <div class="chips" id="vmode"></div>
+    <button class="chip" id="demo">▶ DEMO</button>
     <label class="ctl">VOL <input type="range" id="vol" min="0" max="1" step=".01" value=".85"></label>
     <label class="ctl">ROOM <input type="range" id="room" min="0" max="1" step=".01" value=".6"></label>
     <label class="ctl">HUMAN <input type="range" id="human" min="0" max="1" step=".01" value=".35"></label>
@@ -99,17 +100,33 @@ const nap = () => new Promise(r => setTimeout(r,0));
 let toastT; function toast(s){const e=$('#toast');e.textContent=s;e.style.opacity=1;clearTimeout(toastT);toastT=setTimeout(()=>e.style.opacity=0,1400)}
 
 /* ---------- Kits ---------- */
+const KD={kick:{tune:1,dec:1,click:1},snare:{tune:1,dec:1,wire:1,wireAmt:1,crack:1},tom:{tune:1,dec:1},cym:{tune:1,bright:1,dec:1},hat:{len:1},room:.3,drive:0,thr:-16,ratio:3.2,bpm:120,swing:0};
+const mk=o=>{const k={...KD,...o};for(const x of ['kick','snare','tom','cym','hat'])k[x]={...KD[x],...(o[x]||{})};return k};
+/* patrón demo: 2 compases de 16 pasos separados por '|'. X=fuerte x=normal o=suave */
 const KITS = [
- {id:'ROCK',  name:'STUDIO ROCK', col:{drum:'#00f0ff',cym:'#ffe600',kick:'#ff2bd6',snare:'#00ffa3'},
-  kick:{tune:1,dec:1,click:1}, snare:{tune:1,dec:1,wire:1,wireAmt:1}, tom:{tune:1,dec:1}, cym:{tune:1,bright:1,dec:1}, room:.35},
- {id:'JAZZ',  name:'JAZZ CLUB',   col:{drum:'#a66bff',cym:'#ffb800',kick:'#ff6b9a',snare:'#6bd6ff'},
-  kick:{tune:1.35,dec:.7,click:.35}, snare:{tune:1.1,dec:.8,wire:.6,wireAmt:.5}, tom:{tune:1.3,dec:.8}, cym:{tune:.94,bright:.7,dec:1.2}, room:.55},
- {id:'METAL', name:'METAL',       col:{drum:'#ff2d2d',cym:'#ffffff',kick:'#ff8a00',snare:'#ff2bd6'},
-  kick:{tune:.9,dec:.75,click:1.9}, snare:{tune:1.25,dec:.8,wire:1.3,wireAmt:1.2}, tom:{tune:.8,dec:1}, cym:{tune:1.08,bright:1.3,dec:.9}, room:.12},
- {id:'808',   name:'808 CYBER',   col:{drum:'#b6ff00',cym:'#00f0ff',kick:'#ff2bd6',snare:'#ffe600'}, electro:true,
-  kick:{tune:1,dec:1,click:.6}, snare:{tune:1,dec:1,wire:1,wireAmt:1}, tom:{tune:1,dec:1}, cym:{tune:1.05,bright:1.2,dec:.8}, room:.25},
- {id:'70s',   name:'VINTAGE 70s', col:{drum:'#ff7a00',cym:'#2bffd6',kick:'#ffd34d',snare:'#ff4f7a'},
-  kick:{tune:1.05,dec:.6,click:.5}, snare:{tune:.9,dec:1.2,wire:1,wireAmt:.7}, tom:{tune:.95,dec:.55}, cym:{tune:.9,bright:.55,dec:.9}, room:.2},
+ mk({id:'ROCK',name:'STUDIO ROCK',col:{drum:'#00f0ff',cym:'#ffe600',kick:'#ff2bd6',snare:'#00ffa3'},room:.35,drive:.1,bpm:120,
+  demo:{kick:'x.......x.x.....|x.......x.x.....',snare:'....x.......x...|....x.......x...',hat:'x.x.x.x.x.x.x.x.|x.x.x.x.x.x.x.x.',crash:'X...............|................',t1:'................|............x...',ft:'................|..............X.'}}),
+ mk({id:'METAL',name:'METAL',col:{drum:'#ff2d2d',cym:'#ffffff',kick:'#ff8a00',snare:'#ff2bd6'},
+  kick:{tune:.88,dec:.7,click:2},snare:{tune:1.2,dec:.85,wire:1.2,wireAmt:1.2,crack:1.3},tom:{tune:.78,dec:1.1},cym:{tune:1.08,bright:1.35,dec:.85},hat:{len:.8},room:.1,drive:.45,thr:-20,ratio:4.5,bpm:150,
+  demo:{kick:'xxx.xxx.xxx.xxx.|xxx.xxx.xxx.xx..',snare:'........x.......|........x.......',hat:'x.x.x.x.x.x.x.x.|x.x.x.x.x.x.x...',crash:'X...............|................',t1:'................|............x...',t2:'................|.............x..',ft:'................|..............X.'}}),
+ mk({id:'THRASH',name:'THRASH',col:{drum:'#7dff00',cym:'#ffffff',kick:'#ff2b2b',snare:'#ffe600'},
+  kick:{tune:.95,dec:.55,click:2.2},snare:{tune:1.4,dec:.65,wire:1.4,wireAmt:1.4,crack:1.6},tom:{tune:.9,dec:.8},cym:{tune:1.12,bright:1.5,dec:.7},hat:{len:.7},room:.06,drive:.55,thr:-22,ratio:5,bpm:190,
+  demo:{kick:'x.xxx.xxx.xxx.xx|x.xxx.xxx.xxx.xx',snare:'..x...x...x...x.|..x...x...x...x.',hat:'x.x.x.x.x.x.x.x.|x.x.x.x.x.x.x.x.',crash:'X...............|X...............',t1:'................|............xx..',ft:'................|..............xx'}}),
+ mk({id:'POP',name:'POP',col:{drum:'#ff5fd2',cym:'#8bf0ff',kick:'#ffd34d',snare:'#b6ff00'},
+  kick:{tune:1.05,dec:.8,click:.9},snare:{tune:1.05,dec:1.3,wire:1.1,wireAmt:1.1},tom:{tune:1.05,dec:.9},cym:{bright:1.1},room:.5,drive:.05,thr:-15,ratio:3.5,bpm:105,
+  demo:{kick:'x.....x...x.....|x.....x...x...x.',snare:'....x.......x...|....x.......x...',hat:'x.x.x.x.x.x.x.x.|x.x.x.x.x.x.x.x.',hatO:'..............x.|..............x.',crash:'X...............|................'}}),
+ mk({id:'JAZZ',name:'JAZZ SWING',col:{drum:'#a66bff',cym:'#ffb800',kick:'#ff6b9a',snare:'#6bd6ff'},
+  kick:{tune:1.35,dec:.7,click:.35},snare:{tune:1.1,dec:.8,wire:.6,wireAmt:.5,crack:.5},tom:{tune:1.3,dec:.8},cym:{tune:.94,bright:.7,dec:1.35},hat:{len:1.3},room:.55,thr:-14,ratio:2,bpm:130,swing:.33,
+  demo:{ride:'x...x.x.x...x.x.|x...x.x.x...x.x.',pedal:'....x.......x...|....x.......x...',snare:'o.....o.....o...|..o.....o.....o.',kick:'o...o...o...o...|o...o...o...o...'}}),
+ mk({id:'SKA',name:'SKA',col:{drum:'#ffe600',cym:'#2bff7a',kick:'#ff3b3b',snare:'#00f0ff'},
+  kick:{tune:1.15,dec:.6,click:.8},snare:{tune:1.3,dec:.55,wire:.8,wireAmt:1,crack:1.3},tom:{tune:1.15,dec:.6},cym:{bright:1.1,dec:.8},hat:{len:1.4},room:.2,drive:.1,bpm:160,
+  demo:{kick:'x.......x.......|x.......x.......',snare:'....x.......x...|....x.......x...',hat:'..x...x...x...x.|..x...x...x...x.',hatO:'................|..............x.',crash:'X...............|................'}}),
+ mk({id:'PUNK',name:'PUNK',col:{drum:'#ff4f00',cym:'#ffffff',kick:'#ff2bd6',snare:'#00f0ff'},
+  kick:{tune:1,dec:.75,click:1.5},snare:{tune:1.25,dec:.9,wire:1.2,wireAmt:1.2,crack:1.5},tom:{tune:.95,dec:.8},cym:{tune:1.05,bright:1.25,dec:.9},hat:{len:.9},room:.12,drive:.35,thr:-19,ratio:4,bpm:185,
+  demo:{kick:'x.....x.x.....x.|x.....x.x.....x.',snare:'....x.......x...|....x.......x...',hat:'x.x.x.x.x.x.x.x.|x.x.x.x.x.x.x.x.',crash:'X...............|X...............'}}),
+ mk({id:'808',name:'808 CYBER',col:{drum:'#b6ff00',cym:'#00f0ff',kick:'#ff2bd6',snare:'#ffe600'},electro:true,
+  kick:{click:.6},cym:{tune:1.05,bright:1.2,dec:.8},room:.25,bpm:100,
+  demo:{kick:'x.....x...x.....|x.....x...x...x.',snare:'........x.......|........x.......',hat:'xoxoxoxoxoxoxoxo|xoxoxoxoxoxoxoxo'}}),
 ];
 let kit = KITS[0];
 
@@ -132,7 +149,7 @@ for (const [id,p] of Object.entries(PIECES)) { p.id=id; p.flash=0; p.wob=0; p.wo
 /* =====================================================================
    AUDIO
    ===================================================================== */
-let ac, master, comp, outGain, revSend, revConv, revGain, noiseBufs=[], buses={}, rr=0;
+let ac, master, comp, shaper, outGain, revSend, revConv, revGain, noiseBufs=[], buses={}, rr=0;
 const CYM = {};                       // sets de buffers pre-renderizados
 const KS = {};                        // samples de usuario: pieza -> capas
 
@@ -143,7 +160,8 @@ function initAudio(){
   comp = ac.createDynamicsCompressor();
   comp.threshold.value=-16; comp.knee.value=12; comp.ratio.value=3.2; comp.attack.value=.003; comp.release.value=.14;
   outGain = ac.createGain(); outGain.gain.value=.85;
-  master.connect(comp); comp.connect(outGain); outGain.connect(ac.destination);
+  shaper=ac.createWaveShaper(); shaper.oversample='2x';
+  master.connect(comp); comp.connect(shaper); shaper.connect(outGain); outGain.connect(ac.destination);
   revConv = ac.createConvolver(); revConv.buffer = mkIR(2.1,3.4);
   revGain = ac.createGain(); revGain.gain.value=.2;
   revSend = ac.createGain();
@@ -156,7 +174,12 @@ function initAudio(){
     else { g.connect(master); g.connect(revSend); }
     buses[p.id]=g;
   }
-  applyRoom();
+  applyRoom(); applyMaster();
+}
+function applyMaster(){
+  if(!ac)return;comp.threshold.value=kit.thr;comp.ratio.value=kit.ratio;
+  const k=1+kit.drive*9,n=1024,c=new Float32Array(n);for(let i=0;i<n;i++){const x=i/(n-1)*2-1;c[i]=Math.tanh(x*k)/Math.tanh(k)}
+  shaper.curve=c;
 }
 function mkNoise(sec){const b=ac.createBuffer(1,ac.sampleRate*sec|0,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=rnd()*2-1;return b}
 function mkIR(sec,decay){
@@ -244,7 +267,7 @@ function vSnare(t,v,zone,dest){
   O(t,{f0:b*1.7*1.12,f1:b*1.7,tp:.02,d:.09*S.dec,g:(.12+.3*v),dest});
   N(t,{f:5200,q:.55,a:.001,d:(.14+.24*v)*S.wire,g:(.12+.6*v*v)*S.wireAmt,dest});
   N(t,{type:'highpass',f:2400,a:.001,d:.07*S.wire,g:(.1+.3*v)*S.wireAmt,dest});
-  N(t,{type:'highpass',f:3800,a:.0003,d:.01,g:.05+.3*v,dest});
+  N(t,{type:'highpass',f:3800,a:.0003,d:.01,g:(.05+.3*v)*S.crack,dest});
   if(rim){O(t,{type:'square',f0:1750,f1:1700,d:.025,g:.12*v,dest});N(t,{f:2600,q:1.4,a:.0005,d:.02,g:.6*v,dest})}
 }
 function vTom(t,v,p,zone,dest){
@@ -271,6 +294,7 @@ function vHat(t,v,zone,pedal,dest){
   const set=mode==='open'?CYM.hatO:mode==='pedal'?CYM.hatP:CYM.hatC;
   const r=playBuf(set[(rr++)%set.length],t,{g:(.15+.85*v)*(mode==='pedal'?.7:1),rate:C.tune*(.97+rnd()*.06),lp:(5000+13000*v)*C.bright,dest});
   if(mode==='open')openHat=r;
+  else if(mode==='closed'){const L=kit.hat.len;r.gn.gain.setTargetAtTime(0,t+.025*L,.03*L)}
   if(pedal)O(t,{f0:140,f1:90,tp:.03,d:.05,g:.2,dest});
 }
 function vCymbal(t,v,p,zone,dest){
@@ -551,7 +575,7 @@ if(navigator.requestMIDIAccess)navigator.requestMIDIAccess().then(m=>{
    ===================================================================== */
 function applyKit(k){
   kit=k;document.querySelectorAll('#kits .chip').forEach(c=>{c.classList.toggle('on',c.dataset.id===k.id);c.style.setProperty('--c',k.col.drum)});
-  applyRoom();
+  applyRoom();applyMaster();
 }
 KITS.forEach(k=>{const b=document.createElement('button');b.className='chip';b.textContent=k.id;b.dataset.id=k.id;
   b.onclick=()=>{applyKit(k);toast('KIT: '+k.name)};$('#kits').appendChild(b)});
@@ -563,6 +587,30 @@ Object.keys(VIEWS).forEach(n=>{const b=document.createElement('button');b.classN
 $('#vol').oninput=e=>{if(ac)outGain.gain.setTargetAtTime(+e.target.value,ac.currentTime,.02)};
 $('#room').oninput=applyRoom;
 document.addEventListener('gesturestart',e=>e.preventDefault());
+
+
+/* ---- DEMO: groove característico del kit ---- */
+const DMAP={kick:['kick','head'],snare:['snare','head'],rim:['snare','rim'],hat:['hat','bow'],hatO:['hat','edge'],pedal:['hat','bow',1],
+  ride:['ride','bow'],bell:['ride','bell'],crash:['crash','edge'],t1:['tom1','head'],t2:['tom2','head'],ft:['floor','head']};
+const DV={X:.95,x:.75,o:.38};
+let demoOn=false,demoT=0,demoStep=0,demoNext=0;
+function demoTick(){
+  if(!demoOn)return;
+  const D=kit.demo,sm=60000/kit.bpm/4;
+  for(const [k,pat] of Object.entries(D)){
+    const row=pat.replace('|',''),c=row[demoStep%row.length],m=DMAP[k];
+    if(c&&DV[c]){const d=(demoStep%4===2?kit.swing*sm:0)+(rnd()*6),vel=clamp(DV[c]+(rnd()-.5)*.12,.1,1);
+      setTimeout(()=>{if(demoOn)trigger(PIECES[m[0]],m[1],vel,!!m[2])},d)}
+  }
+  demoStep++;demoNext+=sm;
+  demoT=setTimeout(demoTick,Math.max(0,demoNext-performance.now()));
+}
+function demoToggle(){
+  demoOn=!demoOn;$('#demo').classList.toggle('on',demoOn);$('#demo').textContent=demoOn?'■ STOP':'▶ DEMO';
+  clearTimeout(demoT);
+  if(demoOn){if(ac.state!=='running')ac.resume();demoStep=0;demoNext=performance.now()+60;demoTick()}
+}
+$('#demo').onclick=demoToggle;
 
 /* loop */
 let last=performance.now();
