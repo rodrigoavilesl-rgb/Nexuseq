@@ -9,7 +9,7 @@ El kit original trae un archivo MONO por micrófono por golpe
   - ordena los golpes por potencia real (no confía en la numeración),
   - elige N capas de velocidad x RR variaciones,
   - recorta el silencio inicial (menor latencia) y la cola, con fundido,
-  - escribe FLAC 16 bit + kit.json.
+  - escribe WAV 16 bit + kit.json.
 
 USO:
   python3 build_muldjord.py RUTA/DrumGizmo/MuldjordKit/Samples -o ../kits/muldjord
@@ -73,7 +73,7 @@ def mix_hit(d, instr, n, close, wc, woh, wamb):
 def encode(path, a):
     a = np.clip(a, -1, 1).astype('<f4')
     subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'f32le', '-ar', str(SR), '-ac', '2', '-i', '-',
-                    '-c:a', 'flac', '-sample_fmt', 's16', path], input=a.tobytes(), check=True)
+                    '-c:a', 'pcm_s16le', path], input=a.tobytes(), check=True)
 
 
 def main():
@@ -116,7 +116,7 @@ def main():
                 fn = min(len(m), int(fade * SR))
                 if len(m) >= nn - 1:
                     m[-fn:] *= np.linspace(1, 0, fn)[:, None]
-                name = f"{key.replace(':', '_')}_L{g+1}_{ri+1}.flac"
+                name = f"{key.replace(':', '_')}_L{g+1}_{ri+1}.wav"
                 encode(os.path.join(a.out, 'samples', name), m)
                 files.append('samples/' + name)
             layers.append({'max': 1.0 if g == L - 1 else round((g + 1) / L, 3), 'files': files})
