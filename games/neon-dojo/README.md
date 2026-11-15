@@ -3,8 +3,20 @@
 Juego de pelea 1 contra 1 por puntos, estilo arcade de los 80 con estética synthwave/neón. HTML5 + Canvas + Web Audio en un solo archivo. No usa assets externos: los sprites, escenarios, música y efectos se generan por código.
 
 ## Jugar en Android
-- **PWA (recomendado):** publica la carpeta en cualquier hosting HTTPS (GitHub Pages, por ejemplo), ábrela en Chrome y elige *Agregar a pantalla principal*. Se abre a pantalla completa en horizontal y funciona offline gracias a `sw.js`.
-- **APK:** envuelve `index.html` con Capacitor (`npx cap init`, copia la carpeta a `www/` y ejecuta `npx cap add android`) o con un `WebView` mínimo.
+- **APK (directo):** descarga `dist/NeonDojo-1.0.0.apk` en el teléfono, ábrelo y permite *Instalar apps de origen desconocido* para tu navegador o gestor de archivos. Requiere Android 7.0 o superior y funciona sin internet.
+- **PWA:** publica esta carpeta en un hosting HTTPS (por ejemplo, GitHub Pages), ábrela en Chrome y elige *Agregar a pantalla principal*.
+
+### Compilar el APK
+```bash
+cd android
+ANDROID_HOME=/ruta/al/sdk ./build-apk.sh        # requiere platforms;android-34 y build-tools;34.0.0, JDK 17+
+VERSION_CODE=2 VERSION_NAME=1.1.0 ./build-apk.sh  # para una actualización
+```
+El script no usa Gradle: llama directo a aapt2, javac, d8, zipalign y apksigner. Copia `index.html` a `assets/www` sin las partes de PWA y con la fuente Press Start 2P incluida.
+
+El contenedor nativo (`android/src/.../MainActivity.java`) es un WebView a pantalla completa en horizontal, con modo inmersivo y la pantalla siempre encendida. `NativeBridge` expone `window.NeonNative`, que conecta la voz del árbitro con el TextToSpeech de Android (japonés si está instalado, si no español) y la vibración con el vibrador del teléfono. El botón atrás pausa el combate o vuelve al menú, y en el título cierra la app.
+
+`android/keystore/neondojo.jks` (contraseña `neondojo`) es una **llave de desarrollo para instalar fuera de la tienda**. Para que Android acepte una actualización encima de la versión instalada, hay que firmarla con la misma llave. No la uses para publicar en Google Play: crea una llave propia y pásala con `KEYSTORE=… KEYSTORE_PASS=…`.
 
 ## Controles
 | Táctil | Teclado | Acción |

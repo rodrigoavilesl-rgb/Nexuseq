@@ -334,12 +334,12 @@ const MU={song:null,name:'',step:0,next:0,iv:null,
       AU.osc('sawtooth',midi(base+n-12),tt,d*.95,.05,m,{lp:1200}); tt+=d;});
   }
 };
-function say(txt){ if(!S.voice||!('speechSynthesis' in window)) return;
+function say(txt){ if(!S.voice) return; if(window.NeonNative){ try{NeonNative.speak(txt)}catch(e){} return; } if(!('speechSynthesis' in window)) return;
   try{const ss=speechSynthesis; ss.cancel(); const u=new SpeechSynthesisUtterance(txt);
     const v=ss.getVoices().find(v=>/^ja/i.test(v.lang)); if(v){u.voice=v;u.lang=v.lang;} else u.lang='es-ES';
     u.rate=1.1; u.pitch=.55; u.volume=1; ss.speak(u);}catch(e){} }
 try{ if('speechSynthesis' in window) speechSynthesis.getVoices(); }catch(e){}
-function buzz(ms){ if(S.vib&&navigator.vibrate) try{navigator.vibrate(ms)}catch(e){} }
+function buzz(ms){ if(!S.vib) return; if(window.NeonNative){ try{NeonNative.vibrate(ms)}catch(e){} return; } if(navigator.vibrate) try{navigator.vibrate(ms)}catch(e){} }
 
 /* =========================================================
    POSES · esqueleto por ángulos (grados)
@@ -1057,6 +1057,12 @@ function frame(now){ acc+=Math.min(100,now-last); last=now;
   render(); requestAnimationFrame(frame); }
 
 resize(); toTitle(); requestAnimationFrame(frame);
+/* ganchos para el contenedor Android (botón atrás y ciclo de vida) */
+window.nativeBack=()=>{ if(!$('#mHow').hidden||!$('#mOpts').hidden){ act('back'); return 'ok'; }
+  if(G.mode==='fight'||G.mode==='bonus'){ pause(!G.paused); return 'ok'; }
+  if(G.mode==='title') return 'exit'; act('quit'); return 'ok'; };
+window.nativePause=()=>{ if(G.mode==='fight'||G.mode==='bonus') pause(true); else if(AU.ctx) AU.ctx.suspend(); };
+window.nativeResume=()=>{ if(AU.ctx&&!G.paused) AU.ctx.resume(); };
 if(document.fonts&&document.fonts.load) document.fonts.load('8px "Press Start 2P"').then(()=>{ BGC=[0,1,2,3].map(makeBG); }).catch(()=>{});
 addEventListener('pointerdown',()=>{ AU.init(); if(MU.want&&AU.ctx){ MU.play(MU.want); MU.want=null; } },{capture:true});
 /*SW*/if('serviceWorker' in navigator&&location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});/*/SW*/
