@@ -3,7 +3,7 @@
 Juego de pelea 1 contra 1 por puntos, estilo arcade de los 80 con estética synthwave/neón. HTML5 + Canvas + Web Audio en un solo archivo. No usa assets externos: los sprites, escenarios, música y efectos se generan por código.
 
 ## Jugar en Android
-- **APK (directo):** descarga `dist/NeonDojo-1.0.0.apk` en el teléfono, ábrelo y permite *Instalar apps de origen desconocido* para tu navegador o gestor de archivos. Requiere Android 7.0 o superior y funciona sin internet.
+- **APK (directo):** descarga `dist/NeonDojo.apk` (siempre la última versión) en el teléfono, ábrelo y permite *Instalar apps de origen desconocido* para tu navegador o gestor de archivos. Requiere Android 7.0 o superior y funciona sin internet.
 - **PWA:** publica esta carpeta en un hosting HTTPS (por ejemplo, GitHub Pages), ábrela en Chrome y elige *Agregar a pantalla principal*.
 
 ### Compilar el APK
@@ -43,10 +43,10 @@ La dirección combinada con el botón elige la técnica. → significa hacia el 
 | KI | Ki-ken | imparable | 1 |
 
 ## Reglas
-- Un golpe limpio detiene el intercambio y da IPPON (1 punto) o WAZA-ARI (½ punto). Golpear al rival mientras ataca suma ½ extra (contra).
-- Con 2 puntos ganas el round y con 2 rounds ganas el combate. Cada round dura 30 s.
-- Agacharte esquiva los golpes altos, saltar esquiva el barrido y el KI no se puede bloquear.
-- Modo historia con 4 rivales y dificultad creciente: TORA, KAZE, MIZU y OMEGA. Después de los rivales 1 y 3 hay un bonus de rompimiento de tablas (tameshiwari) que se juega por timing.
+- Cada golpe baja la energía del rival. El round termina por K.O. o cuando se acaban los 60 segundos; en ese caso gana quien tenga más energía. 2 rounds ganan el combate.
+- Puedes encadenar golpes en combo, pero el daño baja con cada golpe y al cuarto golpe el rival cae. Golpear al rival mientras ataca es un CONTRA, que hace un 30 % más de daño.
+- La guardia bloquea el daño; las técnicas pesadas restan 1 punto aunque las bloquees. Agacharte esquiva los golpes altos, saltar esquiva el barrido y el KI no se puede bloquear.
+- Modo historia con 4 rivales y dificultad creciente: TORA, KAZE, MIZU y OMEGA. Después de los rivales 1 y 3 hay un bonus de rompimiento de tablas (tameshiwari).
 
 ## Arquitectura (`index.html`)
 - **Bucle:** la lógica corre a 60 Hz con paso fijo. El render dibuja en un canvas de 480×270 que luego se escala con píxel duro y recibe bloom, scanlines y viñeta (filtro CRT, se puede desactivar).

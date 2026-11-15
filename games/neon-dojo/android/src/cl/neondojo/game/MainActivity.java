@@ -112,6 +112,9 @@ public class MainActivity extends Activity {
     }
 
     void speak(String text) {
-        if (ttsReady) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ref");
+        if (!ttsReady) return;
+        Bundle p = new Bundle();
+        p.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 0.3f);
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, p, "ref");
     }
 }
