@@ -90,7 +90,8 @@ function startMusic(){
 
 /* ---------- input ---------- */
 const keys={},mouse={x:W/2,y:H/2,down:false,right:false,seen:false};
-addEventListener('keydown',e=>{
+cv.tabIndex=0;cv.style.outline='none';const foc=()=>{try{cv.focus({preventScroll:true})}catch(_){}};foc();addEventListener('pointerdown',foc);addEventListener('blur',()=>{for(const k in keys)keys[k]=false;mouse.down=mouse.right=false});
+addEventListener('keydown',e=>{foc();
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Slash','Period','Comma'].includes(e.code))e.preventDefault();
   if(!keys[e.code]){keys[e.code]=true;onKey(e.code)}
 });
