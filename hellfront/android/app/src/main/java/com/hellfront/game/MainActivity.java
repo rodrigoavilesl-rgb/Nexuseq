@@ -7,7 +7,10 @@ import android.view.View;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebViewClient;
+import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
     private WebView web;
@@ -26,14 +29,20 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
-        s.setAllowFileAccess(true);
-        web.setWebViewClient(new WebViewClient());
+        s.setAllowFileAccess(false);
+        final WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this)).build();
+        web.setWebViewClient(new WebViewClient() {
+            @Override public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
+                return loader.shouldInterceptRequest(r.getUrl());
+            }
+        });
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         web.setLongClickable(false);
         web.setOnLongClickListener(v -> true);
         web.setHapticFeedbackEnabled(false);
         setContentView(web);
-        web.loadUrl("file:///android_asset/index.html");
+        web.loadUrl("https://appassets.androidplatform.net/assets/index.html");
         immersive();
     }
 
