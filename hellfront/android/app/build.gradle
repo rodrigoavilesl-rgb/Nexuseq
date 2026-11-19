@@ -1,0 +1,35 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.hellfront.game'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'com.hellfront.game'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '0.1'
+    }
+    signingConfigs {
+        main {
+            storeFile file('../hellfront.keystore')
+            storePassword 'hellfront'
+            keyAlias 'hellfront'
+            keyPassword 'hellfront'
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.main
+            minifyEnabled false
+        }
+        debug { signingConfig signingConfigs.main }
+    }
+}
+
+// Una sola fuente de verdad: el juego vive en ../../index.html
+tasks.register('copyGame', Copy) {
+    from('../../index.html')
+    into('src/main/assets')
+}
+preBuild.dependsOn 'copyGame'
