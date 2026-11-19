@@ -114,8 +114,8 @@ function readInput(p){
   const o={mx:0,my:0,aim:null,fire:false,nade:false,use:false};
   const g=pad(p.id),dz=v=>Math.abs(v)<.25?0:v;
   if(p.id===0){
-    o.mx=(keys.KeyD?1:0)-(keys.KeyA?1:0);o.my=(keys.KeyS?1:0)-(keys.KeyW?1:0);
-    o.fire=mouse.down||keys.Space;o.nade=mouse.right||keys.KeyQ;o.use=!!keys.KeyE;
+    const solo=players.length===1;o.mx=(keys.KeyD||(solo&&keys.ArrowRight)?1:0)-(keys.KeyA||(solo&&keys.ArrowLeft)?1:0);o.my=(keys.KeyS||(solo&&keys.ArrowDown)?1:0)-(keys.KeyW||(solo&&keys.ArrowUp)?1:0);
+    o.fire=mouse.down||keys.Space||(solo&&keys.Period);o.nade=mouse.right||keys.KeyQ||(solo&&keys.Slash);o.use=!!keys.KeyE;
     if(mouse.seen){o.aim=Math.atan2(mouse.y+camY-p.y,mouse.x-p.x);o.mdist=Math.hypot(mouse.y+camY-p.y,mouse.x-p.x)}
   }else{
     o.mx=(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0);o.my=(keys.ArrowDown?1:0)-(keys.ArrowUp?1:0);
