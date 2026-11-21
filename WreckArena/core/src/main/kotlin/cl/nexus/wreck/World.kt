@@ -27,8 +27,8 @@ class World(val size: Float = 2000f) {
         const val SUBSTEPS = 4
 
         // Motor y frenos (u/s²). 1 g ≈ 98 u/s²
-        const val ENGINE_ACC = 85f
-        const val BRAKE_ACC = 105f
+        const val ENGINE_ACC = 120f
+        const val BRAKE_ACC = 130f
         const val MAX_SPEED = 560f
         const val NITRO_SPEED = 780f
         const val REVERSE_MAX = 200f
@@ -38,7 +38,7 @@ class World(val size: Float = 2000f) {
         // Neumáticos
         const val LAT_MAX = 105f             // agarre lateral máximo (~1.07 g)
         const val LONG_MAX = 105f
-        const val GRIP_RATE = 8f
+        const val GRIP_RATE = 12f
         const val WHEELBASE = 30f
         const val MAX_STEER = 0.62f
         const val MU_CONTACT = 0.35f
@@ -362,14 +362,14 @@ class World(val size: Float = 2000f) {
 
         // Dirección: el ángulo de rueda se reduce con la velocidad (estabilidad)
         val speed = c.vel.len()
-        c.wheelAngle = c.steer * MAX_STEER / (1f + (speed / 200f) * (speed / 200f))
+        c.wheelAngle = c.steer * MAX_STEER / (1f + (speed / 150f) * (speed / 150f))
 
         // Yaw por bicicleta, limitado por la aceleración lateral máxima del neumático
         val vf = c.vel.dot(f)
         var wTarget = vf * tan(c.wheelAngle) / WHEELBASE
         val yawLimit = latMax * 1.1f / max(speed, 20f)
         wTarget = wTarget.coerceIn(-yawLimit, yawLimit)
-        c.omega += (wTarget - c.omega) * min(1f, 5f * h)
+        c.omega += (wTarget - c.omega) * min(1f, 10f * h)
         c.omega = c.omega.coerceIn(-9f, 9f)
         c.ang += c.omega * h
 
