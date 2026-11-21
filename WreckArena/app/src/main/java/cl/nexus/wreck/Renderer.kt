@@ -118,6 +118,10 @@ class Renderer {
                     p.color = withA(Palette.BLOOD, (220f * k).toInt())
                     c.drawCircle(x, y, f.size * s, p)
                 }
+                FxKind.SKID -> {
+                    p.color = withA(Palette.BODY, (110f * k).toInt())
+                    c.drawCircle(x, y, f.size * s, p)
+                }
                 FxKind.DEBRIS -> {
                     val hs = f.size * s / 2f
                     p.color = withA(f.color, (255f * k).toInt())
@@ -134,7 +138,7 @@ class Renderer {
         val hw = 13f * s
         c.save()
         c.translate(x, y)
-        c.rotate(Math.toDegrees(car.heading.toDouble()).toFloat())
+        c.rotate(Math.toDegrees(car.ang.toDouble()).toFloat())
 
         if (!car.alive) {
             p.style = Paint.Style.FILL
@@ -181,6 +185,14 @@ class Renderer {
         p.color = car.color
         c.drawRoundRect(-hl, -hw, hl, hw, 7f * s, 7f * s, p)
 
+        // ruedas: las delanteras giran con la dirección real
+        p.style = Paint.Style.FILL
+        p.color = Palette.WHEEL
+        drawWheel(c, hl * 0.62f, -hw - 1.5f * s, car.wheelAngle, s)
+        drawWheel(c, hl * 0.62f, hw + 1.5f * s, car.wheelAngle, s)
+        drawWheel(c, -hl * 0.62f, -hw - 1.5f * s, 0f, s)
+        drawWheel(c, -hl * 0.62f, hw + 1.5f * s, 0f, s)
+
         // faros y llama de nitro
         p.style = Paint.Style.FILL
         p.color = Palette.YELLOW
@@ -190,6 +202,14 @@ class Renderer {
             p.color = Palette.ORANGE
             c.drawRect(-hl - 9f * s, -hw * 0.4f, -hl - s, hw * 0.4f, p)
         }
+        c.restore()
+    }
+
+    private fun drawWheel(c: Canvas, x: Float, y: Float, angle: Float, s: Float) {
+        c.save()
+        c.translate(x, y)
+        c.rotate(Math.toDegrees(angle.toDouble()).toFloat())
+        c.drawRect(-5f * s, -2.5f * s, 5f * s, 2.5f * s, p)
         c.restore()
     }
 

@@ -12,6 +12,8 @@ data class V(val x: Float, val y: Float) {
     operator fun minus(o: V) = V(x - o.x, y - o.y)
     operator fun times(s: Float) = V(x * s, y * s)
     fun dot(o: V) = x * o.x + y * o.y
+    /** Componente z del producto cruz 2D. */
+    fun cross(o: V) = x * o.y - y * o.x
     fun len() = sqrt(x * x + y * y)
     fun norm(): V {
         val l = len()

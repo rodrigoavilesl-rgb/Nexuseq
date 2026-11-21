@@ -6,11 +6,15 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.sqrt
+import kotlin.math.tan
 import kotlin.random.Random
 
 /**
- * Simulación completa: física 2D por circunferencias, daño por zonas,
- * peatones, pickups, IA y reglas de ronda. Sin dependencias de Android.
+ * Simulación: rigid bodies OBB con SAT, impulsos con momento angular,
+ * fricción de contacto, círculo de fricción en neumáticos, bicicleta para
+ * la dirección, daño por energía de impacto y peatones por velocidad de cierre.
+ * Sin dependencias de Android.
  */
 class World(val size: Float = 2000f) {
 
@@ -20,14 +24,37 @@ class World(val size: Float = 2000f) {
         const val PED_MAX = 35
         const val PICKUP_MAX = 4
         const val PED_R = 7f
-        const val REST = 0.3f
-        const val ENGINE_ACC = 720f
-        const val BRAKE_ACC = 1300f
+        const val SUBSTEPS = 4
+
+        // Motor y frenos (u/s²). 1 g ≈ 98 u/s²
+        const val ENGINE_ACC = 85f
+        const val BRAKE_ACC = 105f
         const val MAX_SPEED = 560f
         const val NITRO_SPEED = 780f
         const val REVERSE_MAX = 200f
-        const val SUBSTEPS = 3
+        const val DRAG = 0.000026f           // resistencia aerodinámica: a = DRAG·v²
+        const val ROLL = 0.03f               // rodadura: a = ROLL·v
+
+        // Neumáticos
+        const val LAT_MAX = 105f             // agarre lateral máximo (~1.07 g)
+        const val LONG_MAX = 105f
+        const val GRIP_RATE = 8f
+        const val WHEELBASE = 30f
+        const val MAX_STEER = 0.62f
+        const val MU_CONTACT = 0.35f
+
+        // Contactos
+        const val REST_CAR = 0.2f
+        const val REST_WALL = 0.35f
+        const val IMPACT_MIN = 90f           // cierre que empieza a dañar (~32 km/h)
+        const val DMG_K = 0.0003f            // daño ∝ (v² − v_min²): energía del impacto
+
+        // Peatones (velocidad de cierre)
+        const val PED_STUN = 35f             // ~12 km/h: derriba
+        const val PED_KILL = 100f            // ~36 km/h: mata
     }
+
+    private class Hit(val n: V, val p: V, val impact: Float)
 
     val cars = ArrayList<Car>()
     val peds = ArrayList<Ped>()
@@ -173,6 +200,7 @@ class World(val size: Float = 2000f) {
         val h = dt / SUBSTEPS
         repeat(SUBSTEPS) { if (!roundOver) physicsStep(h, input) }
 
+        updateSkids()
         updatePeds(dt)
         updatePickups(dt)
         updateFx(dt)
@@ -212,9 +240,16 @@ class World(val size: Float = 2000f) {
             if (!a.alive) continue
             for (j in i + 1 until cars.size) {
                 val b = cars[j]
-                if (b.alive && a.alive) carCar(a, b)
+                if (!a.alive) break
+                if (!b.alive) continue
+                val hit = resolveBodies(a, b) ?: continue
+                onHit(a, b, hit)
             }
-            for (bx in boxes) if (a.alive) carBox(a, bx)
+            for (bx in boxes) {
+                if (!a.alive) break
+                val hit = resolveBodies(a, bx) ?: continue
+                onHit(a, bx, hit)
+            }
             if (a.alive) carPeds(a)
         }
         for (c in cars) c.flash = max(0f, c.flash - h)
@@ -267,7 +302,7 @@ class World(val size: Float = 2000f) {
         }
 
         val d = t - c.pos
-        val diff = angleDiff(c.heading, atan2(d.y, d.x))
+        val diff = angleDiff(c.ang, atan2(d.y, d.x))
         c.steer = (diff * 2.2f).coerceIn(-1f, 1f)
         c.throttle = if (abs(diff) > 2.4f) -0.6f else 0.95f
 
@@ -284,123 +319,206 @@ class World(val size: Float = 2000f) {
 
     private fun drive(c: Car, h: Float) {
         val f = c.forward()
-        val right = V(-f.y, f.x)
-        val fwd = c.vel.dot(f)
+        val r = V(-f.y, f.x)
+        val vf0 = c.vel.dot(f)
         val power = c.powerFactor()
 
         if (c.nitroOn) c.nitro = max(0f, c.nitro - 30f * h)
         else c.nitro = min(100f, c.nitro + 6f * h)
         if (c.nitro <= 0f) c.nitroOn = false
 
+        // Motor con curva de potencia (cae a 0 cerca de la velocidad máxima) y frenos
+        var longAcc = 0f
         if (c.throttle > 0f) {
-            val acc = ENGINE_ACC * power * c.throttle * (if (c.nitroOn) 1.7f else 1f)
-            val vMax = (if (c.nitroOn) NITRO_SPEED else MAX_SPEED) * power
-            if (fwd < vMax) c.vel = c.vel + f * (acc * h)
+            val top = if (c.nitroOn) NITRO_SPEED else MAX_SPEED
+            val vp = vf0.coerceAtLeast(0f) / top
+            val curve = (1f - vp * vp).coerceIn(0f, 1f)
+            val boost = if (c.nitroOn) 1.6f else 1f
+            longAcc = ENGINE_ACC * boost * power * c.throttle * curve
         } else if (c.throttle < 0f) {
-            if (fwd > 15f) c.vel = c.vel - f * (BRAKE_ACC * h)
-            else if (fwd > -REVERSE_MAX) c.vel = c.vel - f * (ENGINE_ACC * 0.55f * h)
-        }
-
-        // fricción lateral: agarre alto normal, bajo en derrape
-        val lat = c.vel.dot(right)
-        val drifting = abs(c.steer) > 0.6f && abs(fwd) > 220f
-        var grip = if (drifting) 2.4f else 9f
-        if (c.detached[Zone.REAR.ordinal]) grip *= 0.6f
-        c.vel = c.vel - right * (lat * min(1f, grip * h))
-        c.vel = c.vel * max(0f, 1f - 0.25f * h)
-
-        // giro: depende de velocidad y se invierte en reversa
-        val speedK = (abs(fwd) / 160f).coerceIn(0f, 1f)
-        val dir = if (fwd < -5f) -1f else 1f
-        val maxTurn = 2.9f * speedK * dir * (if (drifting) 1.15f else 1f)
-        c.steerRate += (c.steer * maxTurn - c.steerRate) * min(1f, 10f * h)
-        c.spin *= max(0f, 1f - 3f * h)
-        c.heading += (c.steerRate + c.spin) * h
-        c.pos = c.pos + c.vel * h
-    }
-
-    // ---------------------------------------------------------------- colisiones
-
-    private fun carCar(a: Car, b: Car) {
-        val d = b.pos - a.pos
-        val dist = d.len()
-        val minD = a.radius + b.radius
-        if (dist >= minD || dist < 1e-3f) return
-        val n = d * (1f / dist)
-        val half = (minD - dist) * 0.5f
-        a.pos = a.pos - n * half
-        b.pos = b.pos + n * half
-
-        val rv = (b.vel - a.vel).dot(n)
-        if (rv >= 0f) return
-        val j = -(1f + REST) * rv * 0.5f
-        a.vel = a.vel - n * j
-        b.vel = b.vel + n * j
-
-        val speed = -rv
-        val tv = (b.vel - a.vel).dot(V(-n.y, n.x))
-        a.spin -= tv * 0.003f
-        b.spin += tv * 0.003f
-
-        if (speed > 120f) {
-            val contact = a.pos + n * a.radius
-            val dmg = (speed - 110f) * 0.13f
-            damage(a, b.pos, dmg, b)
-            damage(b, a.pos, dmg, a)
-            burst(contact, 8, 220f, FxKind.SPARK, 0.35f, 2.5f, Palette.YELLOW)
-            shake = min(shake + speed / 200f, 2.5f)
-        }
-    }
-
-    private fun carBox(c: Car, b: Box) {
-        val q = closestOnBox(c.pos, b)
-        val d = c.pos - q
-        val dist = d.len()
-        if (dist >= c.radius) return
-        val n = if (dist > 1e-3f) d * (1f / dist) else V(0f, -1f)
-        c.pos = c.pos + n * (c.radius - dist)
-        val vn = c.vel.dot(n)
-        if (vn < 0f) {
-            c.vel = c.vel - n * ((1f + 0.35f) * vn)
-            val impact = -vn
-            val dmg = max(0f, impact - 120f) * 0.13f
-            // la pared está en dirección -n desde el auto
-            damage(c, c.pos - n * 40f, dmg, null)
-            if (impact > 140f) {
-                burst(q, 4, 180f, FxKind.SPARK, 0.3f, 2f, Palette.YELLOW)
-                shake = min(shake + impact / 250f, 2.5f)
+            longAcc = when {
+                vf0 > 15f -> -BRAKE_ACC * -c.throttle
+                vf0 > -REVERSE_MAX -> -ENGINE_ACC * 0.5f * -c.throttle
+                else -> 0f
             }
         }
+        // Resistencias: aire (cuadrática) y rodadura
+        longAcc -= DRAG * vf0 * abs(vf0) + ROLL * vf0
+
+        // Círculo de fricción: el agarre lateral disponible cae con la carga longitudinal
+        val lr = (longAcc / LONG_MAX).coerceIn(-1f, 1f)
+        var latMax = LAT_MAX * sqrt(1f - lr * lr)
+        if (c.detached[Zone.REAR.ordinal]) latMax *= 0.6f
+        val vl0 = c.vel.dot(r)
+        val latAcc = (-vl0 * GRIP_RATE).coerceIn(-latMax, latMax)
+
+        c.vel = c.vel + f * (longAcc * h) + r * (latAcc * h)
+
+        // Dirección: el ángulo de rueda se reduce con la velocidad (estabilidad)
+        val speed = c.vel.len()
+        c.wheelAngle = c.steer * MAX_STEER / (1f + (speed / 200f) * (speed / 200f))
+
+        // Yaw por bicicleta, limitado por la aceleración lateral máxima del neumático
+        val vf = c.vel.dot(f)
+        var wTarget = vf * tan(c.wheelAngle) / WHEELBASE
+        val yawLimit = latMax * 1.1f / max(speed, 20f)
+        wTarget = wTarget.coerceIn(-yawLimit, yawLimit)
+        c.omega += (wTarget - c.omega) * min(1f, 5f * h)
+        c.omega = c.omega.coerceIn(-9f, 9f)
+        c.ang += c.omega * h
+
+        c.pos = c.pos + c.vel * h
+        c.latSpeed = abs(c.vel.dot(V(-sin(c.ang), cos(c.ang))))
+    }
+
+    private fun updateSkids() {
+        for (c in cars) {
+            if (!c.alive || c.latSpeed < 60f) continue
+            if (Random.nextFloat() > 0.35f) continue
+            val f = c.forward()
+            fx += Fx(c.pos - f * 20f, V(0f, 0f), FxKind.SKID, 3f, 4f, Palette.BODY)
+        }
+    }
+
+    // ---------------------------------------------------------------- geometría de contacto
+
+    private fun axes(b: Body): Pair<V, V> {
+        val u = V(cos(b.ang), sin(b.ang))
+        return Pair(u, V(-u.y, u.x))
+    }
+
+    private fun support(b: Body, n: V): Float {
+        val (u, v) = axes(b)
+        return abs(n.dot(u)) * b.hx + abs(n.dot(v)) * b.hy
+    }
+
+    private fun corners(b: Body): List<V> {
+        val (u, v) = axes(b)
+        return listOf(
+            b.pos + u * b.hx + v * b.hy,
+            b.pos + u * b.hx - v * b.hy,
+            b.pos - u * b.hx + v * b.hy,
+            b.pos - u * b.hx - v * b.hy,
+        )
+    }
+
+    private fun velAt(b: Body, r: V): V = b.vel + V(-r.y, r.x) * b.omega
+
+    private fun applyImpulse(b: Body, imp: V, r: V) {
+        if (b.invM == 0f) return
+        b.vel = b.vel + imp * b.invM
+        b.omega += r.cross(imp) * b.invI
+    }
+
+    /** SAT entre dos OBB + impulso con fricción. Devuelve null si no hay solape. */
+    private fun resolveBodies(a: Body, b: Body): Hit? {
+        if (a.invM == 0f && b.invM == 0f) return null
+        val (ua, va) = axes(a)
+        val (ub, vb) = axes(b)
+        val candidates = listOf(ua, va, ub, vb)
+        val d = b.pos - a.pos
+
+        var minOv = Float.MAX_VALUE
+        var n = V(0f, 0f)
+        for (ax in candidates) {
+            val dist = abs(d.dot(ax))
+            val ov = support(a, ax) + support(b, ax) - dist
+            if (ov <= 0f) return null
+            if (ov < minOv) {
+                minOv = ov
+                n = if (d.dot(ax) >= 0f) ax else ax * -1f
+            }
+        }
+
+        // Punto de contacto: el vértice que más penetra
+        val aFace = a.pos.dot(n) + support(a, n)
+        val bFace = b.pos.dot(n) - support(b, n)
+        var bestDep = -Float.MAX_VALUE
+        var contact = b.pos
+        for (q in corners(b)) {
+            val dep = aFace - q.dot(n)
+            if (dep > bestDep) { bestDep = dep; contact = q }
+        }
+        for (p in corners(a)) {
+            val dep = p.dot(n) - bFace
+            if (dep > bestDep) { bestDep = dep; contact = p }
+        }
+
+        // Corrección de posición según masas inversas
+        val inv = a.invM + b.invM
+        if (inv > 0f) {
+            a.pos = a.pos - n * (minOv * 0.85f * a.invM / inv)
+            b.pos = b.pos + n * (minOv * 0.85f * b.invM / inv)
+        }
+
+        val ra = contact - a.pos
+        val rb = contact - b.pos
+        val vn = (velAt(b, rb) - velAt(a, ra)).dot(n)
+        if (vn >= 0f) return Hit(n, contact, 0f)
+
+        val e = if (a.invM == 0f || b.invM == 0f) REST_WALL else REST_CAR
+        val kN = inv + ra.cross(n).let { it * it } * a.invI + rb.cross(n).let { it * it } * b.invI
+        val jn = -(1f + e) * vn / kN
+        applyImpulse(a, n * -jn, ra)
+        applyImpulse(b, n * jn, rb)
+
+        // Fricción de Coulomb en la tangente
+        val t = V(-n.y, n.x)
+        val vt = (velAt(b, rb) - velAt(a, ra)).dot(t)
+        val kT = inv + ra.cross(t).let { it * it } * a.invI + rb.cross(t).let { it * it } * b.invI
+        val maxF = MU_CONTACT * jn
+        val jt = (-vt / kT).coerceIn(-maxF, maxF)
+        applyImpulse(a, t * -jt, ra)
+        applyImpulse(b, t * jt, rb)
+
+        return Hit(n, contact, -vn)
+    }
+
+    private fun onHit(a: Car, b: Body, hit: Hit) {
+        if (hit.impact <= IMPACT_MIN) return
+        val dmg = (hit.impact * hit.impact - IMPACT_MIN * IMPACT_MIN) * DMG_K
+        damage(a, hit.p, dmg, if (b is Car) b else null)
+        if (b is Car) damage(b, hit.p, dmg, a)
+        burst(hit.p, 6 + (hit.impact / 40f).toInt(), hit.impact * 0.6f, FxKind.SPARK, 0.35f, 2.5f, Palette.YELLOW)
+        shake = min(shake + hit.impact / 400f, 2.5f)
     }
 
     private fun carPeds(c: Car) {
-        val speed = c.vel.len()
         for (p in peds) {
             if (!p.alive) continue
-            val d = p.pos - c.pos
+            val local = (p.pos - c.pos).rot(-c.ang)
+            val cl = V(local.x.coerceIn(-c.hx, c.hx), local.y.coerceIn(-c.hy, c.hy))
+            val closest = c.pos + cl.rot(c.ang)
+            val d = p.pos - closest
             val dist = d.len()
-            val minD = c.radius + PED_R
-            if (dist >= minD || dist < 1e-3f) continue
-            val n = d * (1f / dist)
-            if (speed > 70f) {
+            if (dist >= PED_R) continue
+            val n = if (dist > 1e-3f) d * (1f / dist) else (p.pos - c.pos).norm()
+            p.pos = closest + n * PED_R
+
+            val carV = velAt(c, closest - c.pos)
+            val closing = (carV - p.vel).dot(n)
+            if (closing < 8f) continue
+
+            if (closing >= PED_KILL) {
                 p.alive = false
                 p.timer = 2.5f
-                p.vel = c.vel * 0.9f + n * 80f
+                p.vel = carV * 0.9f + n * (closing * 0.9f)
                 burst(p.pos, 14, 150f, FxKind.BLOOD, 0.9f, 3f, Palette.BLOOD)
                 if (c.isPlayer) {
                     score += 50 * combo
                     bumpCombo()
                 }
-            } else {
-                p.pos = p.pos + n * (minD - dist)
+            } else if (closing >= PED_STUN) {
+                p.stunT = 1.5f
+                p.vel = n * (closing * 1.0f) + carV * 0.3f
             }
         }
     }
 
-    /** Aplica daño por zona según la dirección del impacto; desborde va al casco. */
+    /** Daño por zona según el punto de contacto; el desborde va al casco. */
     private fun damage(c: Car, from: V, amount: Float, by: Car?) {
         if (!c.alive || amount < 0.5f) return
-        val l = (from - c.pos).rot(-c.heading)
+        val l = (from - c.pos).rot(-c.ang)
         val zi = if (abs(l.x) > abs(l.y)) {
             if (l.x > 0f) Zone.FRONT.ordinal else Zone.REAR.ordinal
         } else {
@@ -459,7 +577,7 @@ class World(val size: Float = 2000f) {
             Zone.LEFT.ordinal -> V(0f, -13f)
             else -> V(0f, 13f)
         }
-        burst(c.pos + off.rot(c.heading), 10, 170f, FxKind.DEBRIS, 1.6f, 6f, Palette.YELLOW)
+        burst(c.pos + off.rot(c.ang), 10, 170f, FxKind.DEBRIS, 1.6f, 6f, Palette.YELLOW)
         shake = max(shake, 1.2f)
     }
 
@@ -471,6 +589,12 @@ class World(val size: Float = 2000f) {
                 p.timer -= dt
                 p.vel = p.vel * max(0f, 1f - 4f * dt)
                 p.pos = p.pos + p.vel * dt
+                continue
+            }
+            if (p.stunT > 0f) {
+                p.stunT -= dt
+                p.vel = p.vel * max(0f, 1f - 3f * dt)
+                p.pos = pushOutOfBoxes(p.pos + p.vel * dt, PED_R)
                 continue
             }
             p.wanderT -= dt

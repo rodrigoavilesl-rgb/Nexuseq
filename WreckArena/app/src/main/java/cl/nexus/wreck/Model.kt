@@ -5,29 +5,62 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
+/*
+ * Escala: 1 unidad = 0.1 m. Un auto de 52 u ≈ 5.2 m; 560 u/s ≈ 200 km/h.
+ * g ≈ 98 u/s². Masa normalizada a 1 para autos (todos iguales).
+ */
+
 enum class Zone { FRONT, REAR, LEFT, RIGHT }
 enum class PickupType { REPAIR, NITRO }
-enum class FxKind { SPARK, SMOKE, BLOOD, DEBRIS }
+enum class FxKind { SPARK, SMOKE, BLOOD, DEBRIS, SKID }
 
-class Box(val x: Float, val y: Float, val w: Float, val h: Float)
+/** Cuerpo rígido rectangular (OBB). invM = 0 significa estático. */
+interface Body {
+    var pos: V
+    var vel: V
+    var omega: Float
+    var ang: Float
+    val hx: Float
+    val hy: Float
+    val invM: Float
+    val invI: Float
+}
+
+class Box(val x: Float, val y: Float, val w: Float, val h: Float) : Body {
+    override var pos = V(x + w / 2f, y + h / 2f)
+    override var vel = V(0f, 0f)
+    override var omega = 0f
+    override var ang = 0f
+    override val hx = w / 2f
+    override val hy = h / 2f
+    override val invM = 0f
+    override val invI = 0f
+}
 
 class Car(
     val id: Int,
     val isPlayer: Boolean,
     val color: Int,
-    var pos: V,
-    var heading: Float,
-) {
-    val radius = 26f
-    var vel = V(0f, 0f)
-    var spin = 0f
-    var steerRate = 0f
-    var throttle = 0f          // -1..1
-    var steer = 0f             // -1..1
+    pos0: V,
+    ang0: Float,
+) : Body {
+    override var pos = pos0
+    override var vel = V(0f, 0f)
+    override var omega = 0f
+    override var ang = ang0
+    override val hx = 26f
+    override val hy = 13f
+    override val invM = 1f
+    override val invI = 1f / 282.7f          // m·(w²+h²)/12 con m = 1
+
+    var throttle = 0f                         // -1..1
+    var steer = 0f                            // -1..1
+    var wheelAngle = 0f                       // ángulo real de las ruedas delanteras (rad)
+    var latSpeed = 0f                         // velocidad lateral (para marcas de derrape)
     var nitro = if (isPlayer) 100f else 0f
     var nitroOn = false
     var hull = 100f
-    val zones = FloatArray(4) { 100f }   // índice = Zone.ordinal
+    val zones = FloatArray(4) { 100f }       // índice = Zone.ordinal
     val detached = BooleanArray(4)
     var alive = true
     var respawnT = 0f
@@ -35,7 +68,7 @@ class Car(
     var aiStuckT = 0f
     var aiReverseT = 0f
 
-    fun forward() = V(cos(heading), sin(heading))
+    fun forward() = V(cos(ang), sin(ang))
     fun powerFactor() = if (detached[Zone.FRONT.ordinal]) 0.72f else 1f
 }
 
@@ -43,6 +76,7 @@ class Ped(var pos: V, val color: Int) {
     var vel = V(0f, 0f)
     var alive = true
     var timer = 0f
+    var stunT = 0f
     var wander = V(0f, 0f)
     var wanderT = 0f
 }
@@ -77,13 +111,12 @@ fun closestOnBox(p: V, b: Box) = V(
 
 fun distToBox(p: V, b: Box) = (p - closestOnBox(p, b)).len()
 
-fun clamp01(v: Float) = max(0f, min(1f, v))
-
 object Palette {
     val BG = 0xFF05020C.toInt()
     val GRID = 0x2200F0FF.toInt()
     val WALL_FILL = 0xFF0E0820.toInt()
     val BODY = 0xFF0B0716.toInt()
+    val WHEEL = 0xFF1A1A22.toInt()
     val WRECK = 0xFF141414.toInt()
     val BLOOD = 0xFFB0001E.toInt()
     val WHITE = 0xFFFFFFFF.toInt()
@@ -111,7 +144,7 @@ fun healthColor(hp: Float): Int = when {
 
 /** Geometría de botones táctiles compartida por input y render. */
 object Layout {
-    fun btnR(w: Float, h: Float) = minOf(w, h) * 0.13f
+    fun btnR(w: Float, h: Float) = min(w, h) * 0.13f
     fun gas(w: Float, h: Float) = V(w * 0.87f, h * 0.70f)
     fun brake(w: Float, h: Float) = V(w * 0.70f, h * 0.70f)
     fun nitro(w: Float, h: Float) = V(w * 0.87f, h * 0.36f)
@@ -125,3 +158,4 @@ object Layout {
         return dx * dx + dy * dy <= r * r
     }
 }
+
