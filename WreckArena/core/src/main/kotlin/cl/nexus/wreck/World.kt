@@ -105,6 +105,12 @@ class World(val size: Float = 2000f) {
         bannerT = 2f
     }
 
+    /** Reinicia la ronda actual (tecla R en escritorio). */
+    fun restart() {
+        roundNo++
+        newRound()
+    }
+
     private fun endRound(msg: String) {
         if (roundOver) return
         roundOver = true

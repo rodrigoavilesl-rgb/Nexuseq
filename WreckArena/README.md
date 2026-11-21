@@ -38,3 +38,16 @@ app/src/main/java/cl/nexus/wreck/
 - Más mapas, modos (campaña, deathmatch por equipos) y garaje con mejoras.
 - Multijugador, sistema de logros y guardado persistente.
 - Ajuste fino de balance: los valores están en `World.kt` (companion object y constantes de `damage`/`drive`).
+
+## Versión de escritorio (PC)
+Requisito: Java 17 o superior.
+```
+./gradlew :desktop:fatJar
+java -jar desktop/build/libs/WreckArena-desktop.jar
+```
+Controles: flechas o WASD para dirigir y acelerar/frenar · Espacio o Shift = NOS · R = reiniciar ronda.
+
+## Módulos
+- `core/` — lógica pura (física, daño, IA, reglas). Compartida por Android y escritorio. Tests: `./gradlew :core:test`.
+- `app/` — Android (SurfaceView, multitáctil).
+- `desktop/` — Swing/Java2D, mismo HUD y escena.

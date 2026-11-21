@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "WreckArena"
-include(":app")
+include(":core", ":app", ":desktop")
