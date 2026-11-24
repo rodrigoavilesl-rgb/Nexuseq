@@ -21,6 +21,7 @@ rep('<section id="t-pen" hidden>',PANELS+'<section id="t-pen" hidden>')
 rep('<div class="drop" id="drop">','<div class="alerts ok" style="margin-bottom:8px"><b>Un solo lugar para cargar todo</b> (en cualquier orden): la <b>OT del inspector</b> (.xls), la <b>respuesta de Aliservice</b> (.json del formulario o Excel) y los <b>respaldos</b> (.json). El sistema reconoce cada archivo solo.</div><div class="drop" id="drop">')
 # 3. estilos + lógica de la guía
 EXTRA=open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"ot_extra.html"),encoding="utf8").read()
-k=src.rindex('</body>');src=src[:k]+EXTRA+src[k:]
+THEME=open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"ot_theme.html"),encoding="utf8").read()
+k=src.rindex('</body>');src=src[:k]+EXTRA+THEME+src[k:]
 out=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),"Desviaciones_Simple_OT.html")
 open(out,"w",encoding="utf8").write(src);print("OK",out,len(src)//1024,"KB")
