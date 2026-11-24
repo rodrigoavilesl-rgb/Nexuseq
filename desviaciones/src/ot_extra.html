@@ -1,0 +1,41 @@
+<style>
+#nav button:nth-child(-n+5){font-size:13px}
+#nav button:nth-child(-n+5):not(:first-child)::before{content:attr(data-n);}
+.sp1{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 12px}.sp1 .sw{display:flex;border:1px solid #C9D0D4;border-radius:4px;overflow:hidden}.sp1 .sw button{background:#fff;border:0;padding:8px 18px;font-weight:700;cursor:pointer;color:#36424A}.sp1 .sw button.on{background:#E55302;color:#fff}
+.nx{display:flex;justify-content:space-between;margin-top:12px;gap:8px}
+</style>
+<script>
+/* ===== Capa SIMPLE sobre el motor validado: pasos 2 y 3, y carga unificada (OT + respuestas + respaldos) ===== */
+(function(){
+  const amb=(fn)=>'<div class="sp1"><div class="sw"><button class="'+(INI_AMB==="Alimentación"?"on":"")+'" onclick="INI_AMB=\'Alimentación\';'+fn+'()">Alimentación</button><button class="'+(INI_AMB==="Campamento"?"on":"")+'" onclick="INI_AMB=\'Campamento\';'+fn+'()">Campamento</button></div></div>';
+  window.rEnv=function(){
+    const t=S.items.filter(selFn(INI_AMB)),a=t.filter(e=>e.est==="Abierto"),porEnv=a.filter(e=>!(e.rq||[]).length).length,env=a.length-porEnv,esp=(S.espera||[]).length;
+    $("envx").innerHTML='<div class="card"><h2>Paso 2 · Enviar a Aliservice</h2>'+amb("rEnv")+
+      '<div class="kpis" style="grid-template-columns:repeat(4,1fr)"><div><b>'+a.length+'</b><span>observaciones abiertas</span></div><div><b style="color:#E55302">'+porEnv+'</b><span>aún no enviadas</span></div><div><b>'+env+'</b><span>ya enviadas</span></div><div><b>'+esp+'</b><span>respuestas en espera de su OT</span></div></div>'+
+      '<div class="alerts">Descarga el <b>formulario</b> (lleva la foto de cada observación abierta) y envíaselo a Aliservice. Ellos responden estado, fecha, acción y fotos de evidencia, y te devuelven <b>un archivo</b>: lo cargas en el <b>Paso 1</b>.</div>'+
+      '<div class="bar" style="margin-top:10px"><button class="btn" '+(a.length?"":"disabled")+' onclick="iniGo(rcHtml)">⬇ Formulario HTML con fotos (recomendado)</button><button class="alt" '+(a.length?"":"disabled")+' onclick="iniGo(rcFmt)">⬇ Formato Excel alternativo</button></div></div>'+
+      '<div class="nx"><button class="alt" onclick="tab(\'car\')">← 1 · Cargar</button><button class="btn" onclick="tab(\'vis\')">3 · Visar →</button></div>';
+  };
+  window.rVis=function(){
+    const t=S.items.filter(selFn(INI_AMB)),porV=t.filter(e=>e.est==="Abierto"&&e.vr==="pend"&&e.rc),rech=t.filter(e=>e.vr==="rech").length,ok=t.filter(e=>e.vr==="ok").length;
+    $("visx").innerHTML='<div class="card c2"><h2>Paso 3 · Visar las respuestas de Aliservice</h2>'+amb("rVis")+
+      '<div class="kpis" style="grid-template-columns:repeat(3,1fr)"><div><b style="color:#0098AA">'+porV.length+'</b><span>por visar</span></div><div><b style="color:#1F9D55">'+ok+'</b><span>cerradas y visadas</span></div><div><b style="color:#C13832">'+rech+'</b><span>rechazadas (esperan nueva respuesta)</span></div></div>'+
+      '<div class="alerts">Verás el <b>antes</b> (foto de la OT) y el <b>después</b> (evidencia de Aliservice). Atajos: <b>V</b> = Verificado · <b>R</b> = Rechazar con motivo · <b>S</b> = Saltar. Lo verificado queda cerrado; lo rechazado vuelve a Aliservice.</div>'+
+      '<div class="bar" style="margin-top:10px"><button class="btn" '+(porV.length?"":"disabled")+' onclick="iniGo(visar)">Visar ahora ('+porV.length+')</button></div></div>'+
+      '<div class="nx"><button class="alt" onclick="tab(\'env\')">← 2 · Enviar</button><button class="btn" onclick="tab(\'inf\')">4 · Informes →</button></div>';
+  };
+  const _tab=window.tab;
+  window.tab=function(e){_tab(e);if(e==="env")rEnv();if(e==="vis")rVis()};
+  /* carga unificada: los respaldos .json del sistema se fusionan; el resto sigue el flujo normal */
+  const _on=window.onFiles;
+  window.onFiles=async function(files){
+    files=[...files];const rest=[];
+    for(const f of files){
+      if(/\.json$/i.test(f.name)){let j=null;try{j=JSON.parse(await f.text())}catch(e){}
+        if(j&&j.sistema==="TITAN-DESV"){await impJson(f);continue}}
+      rest.push(f);
+    }
+    if(rest.length)return _on(rest);
+  };
+})();
+</script>
