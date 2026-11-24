@@ -1,0 +1,9 @@
+ESCENARIO FICTICIO DE PRUEBA (todo inventado: personas, fotos y datos)
+Orden de uso en Desviaciones_Simple_OT.html:
+ 1. Paso 1 Cargar: arrastra las 2 OT (OT-*.xls)  -> 12 observaciones con foto.
+ 2. Paso 1 Cargar: arrastra las 2 respuestas (Respuesta_Aliservice_*.json) -> 10 respuestas de Aliservice (2 observaciones quedan sin respuesta, vencidas).
+ 3. Paso 3 Visar: verifica (V) / rechaza (R) cada respuesta.
+ 4. Paso 4 Informes: mes 2026-11, casino Alimentacion o Campamento.
+Los Formulario_Respuesta_*_RESPONDIDO.html son los formularios que se envían a Aliservice, ya contestados (ábrelos para verlos).
+Informe_*_EJEMPLO.pdf: resultado esperado tras visar 3 y rechazar 1 por ámbito.
+Regenerar: src/gen_prueba.py y src/gen_respuestas.py
