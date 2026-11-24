@@ -1,0 +1,590 @@
+<!doctype html>
+<!--
+  TITAN-NEXUS · Consolidado de Desviaciones — versión SIMPLE (3 pasos)
+  Mismos informes validados que la versión completa, flujo secuencial:
+  1 Cargar Excel  →  2 Revisar pendientes  →  3 Generar informe
+  © 2026 Rodrigo Andrés Avilés Lazcano. Uso bajo licencia. Prohibida su copia o redistribución sin autorización.
+-->
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Consolidado de Desviaciones · Simple</title>
+<style>
+/* ============ TEMA DE LA APP (dark / neón) ============ */
+:root{--bg:#06080c;--pn:#0d121a;--pn2:#121a25;--ln:#1f2b3a;--tx:#dfe9f5;--mu:#7d90a6;--cy:#00e5ff;--mg:#ff2bd6;--li:#b6ff3c;--am:#ffb300;--rd:#ff3b5c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif}
+.mono{font-family:ui-monospace,"Ubuntu Mono",Consolas,monospace;letter-spacing:.04em}
+header.top{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--ln);background:linear-gradient(90deg,#0a0f16,#10081a)}
+header.top h1{font-size:15px;margin:0;letter-spacing:.12em;text-transform:uppercase}
+header.top h1 i{color:var(--cy);font-style:normal}
+header.top .sp{flex:1}
+header.top small{color:var(--mu)}
+.steps{display:flex;gap:8px;padding:12px 16px;flex-wrap:wrap}
+.steps button{flex:1;min-width:150px;display:flex;align-items:center;gap:10px;background:var(--pn);border:1px solid var(--ln);color:var(--mu);padding:10px 12px;cursor:pointer;text-align:left;border-radius:6px;font:inherit}
+.steps button b{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid var(--mu);font:700 13px ui-monospace,monospace;flex:none}
+.steps button.on{color:var(--tx);border-color:var(--cy);box-shadow:0 0 14px #00e5ff33 inset,0 0 10px #00e5ff22}
+.steps button.on b{border-color:var(--cy);color:var(--cy)}
+.steps button.done b{background:var(--li);border-color:var(--li);color:#000}
+main{padding:0 16px 40px;max-width:1500px;margin:auto}
+section.panel{display:none}section.panel.on{display:block}
+.card{background:var(--pn);border:1px solid var(--ln);border-left:3px solid var(--cy);border-radius:6px;padding:14px 16px;margin-bottom:14px}
+.card.mg{border-left-color:var(--mg)}.card.li{border-left-color:var(--li)}.card.am{border-left-color:var(--am)}
+.card h2{margin:0 0 6px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--cy)}
+.how{color:var(--mu);font-size:13px;margin:0 0 10px}
+.how b{color:var(--tx)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.06em}
+input,select,textarea{background:#0a0f16;border:1px solid var(--ln);color:var(--tx);padding:7px 8px;font:13px system-ui,Arial;border-radius:4px;width:100%}
+input:focus,select:focus,textarea:focus{outline:1px solid var(--cy);box-shadow:0 0 8px #00e5ff44}
+textarea{resize:vertical;min-height:60px}
+.btn{background:var(--cy);color:#001014;border:0;padding:9px 16px;font:700 13px system-ui;cursor:pointer;border-radius:4px;box-shadow:0 0 12px #00e5ff55}
+.btn:hover{filter:brightness(1.1)}.btn[disabled]{opacity:.35;cursor:not-allowed;box-shadow:none}
+.btn.mg{background:var(--mg);box-shadow:0 0 12px #ff2bd655;color:#16001a}
+.alt{background:transparent;border:1px solid var(--ln);color:var(--tx);padding:8px 13px;font:600 13px system-ui;cursor:pointer;border-radius:4px}
+.alt:hover{border-color:var(--cy);color:var(--cy)}.alt.dng{color:var(--rd);border-color:#5a1a28}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:10px 0}
+.drop{border:2px dashed var(--ln);border-radius:8px;padding:26px;text-align:center;color:var(--mu);background:#0a0f16;transition:.15s}
+.drop.on{border-color:var(--cy);background:#00e5ff10;color:var(--cy)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0 0 12px}
+.kpis div{background:var(--pn2);border:1px solid var(--ln);border-top:2px solid var(--cy);padding:8px 10px;border-radius:4px}
+.kpis b{display:block;font:700 24px ui-monospace,monospace;color:var(--tx)}
+.kpis span{font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em}
+.kpis .w{border-top-color:var(--am)}.kpis .r{border-top-color:var(--rd)}.kpis .g{border-top-color:var(--li)}
+.msg{border-left:3px solid var(--am);background:#1a1606;padding:8px 12px;margin:8px 0;font-size:13px;border-radius:0 4px 4px 0}
+.msg.ok{border-left-color:var(--li);background:#0c1a08}.msg.bad{border-left-color:var(--rd);background:#1c0a10}
+.msg ul{margin:4px 0 0;padding-left:18px}
+.tw{overflow:auto;border:1px solid var(--ln);border-radius:4px;max-height:60vh}
+table.dt{border-collapse:collapse;width:100%}
+.dt th{position:sticky;top:0;background:#101823;color:var(--cy);text-align:left;padding:6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;z-index:1}
+.dt td{padding:5px 6px;border-bottom:1px solid var(--ln);font-size:12px;vertical-align:top}
+.dt tr:hover td{background:#0f1722}
+.dt td input,.dt td select{padding:3px 4px;font-size:12px;min-width:120px}
+.pill{display:inline-block;padding:1px 7px;border-radius:9px;font:700 10px ui-monospace,monospace;color:#000}
+.pill.Alto{background:var(--rd)}.pill.Medio{background:var(--am)}.pill.Bajo{background:var(--li)}
+.nav{display:flex;justify-content:space-between;margin-top:16px;gap:8px}
+#ajustes{position:fixed;inset:0;background:#000c;display:none;z-index:30;overflow:auto;padding:20px}
+#ajustes .card{max-width:980px;margin:0 auto 14px}
+details{margin-top:10px}summary{cursor:pointer;color:var(--cy);font-size:13px}
+
+/* ============ INFORME (hoja clara validada, apta impresión) ============ */
+:root{--o:#E55302;--y:#F4AA00;--c:#0098AA;--ink:#0B1014;--s:#36424A;--rbg:#ECEFF0;--rpn:#F8FAFA;--rln:#C9D0D4;--g:#2E9E5B;--r:#C13832}
+#report{color:var(--ink);font:13px/1.45 Roboto,Arial,sans-serif}
+.rp{background:#fff;border:1px solid var(--rln);padding:14px 18px;max-width:1200px;margin:0 auto 16px}
+.rp .hd{display:flex;align-items:center;gap:14px}.rp .hd img{height:50px}.rp .hm{flex:1;display:flex;flex-direction:column}
+.rp .mono{color:var(--s);font-size:12px}.rp .mono i{color:var(--o);font-style:normal}
+.rp h1{font:700 21px Montserrat,Arial,sans-serif;margin:6px 0 3px;color:var(--ink)}.rp .sub{color:var(--s);font-size:11px;margin-bottom:8px}
+.rp .kp{display:flex;gap:8px;margin:8px 0}.rp .k{flex:1;border:1px solid var(--rln);border-top:3px solid var(--o);padding:6px 10px}
+.rp .k b{display:block;font:700 22px Montserrat,Arial,sans-serif}.rp .k span{font-size:11px;color:var(--s)}
+.rp h3{font:700 12px Montserrat,Arial,sans-serif;margin:12px 0 5px;border-left:4px solid var(--o);padding-left:7px;color:var(--ink)}
+.rp .sum{border-left:4px solid var(--c);background:var(--rpn);padding:8px 11px;font-size:12px;line-height:1.5;white-space:pre-wrap}
+.rp .two{display:flex;gap:16px}.rp .two>div{flex:1;break-inside:avoid}
+.rp table.t{width:100%;border-collapse:collapse}.rp .t th{background:var(--rbg);border-bottom:3px solid var(--o);text-align:left;padding:4px 5px;font-size:10px;color:var(--ink)}
+.rp .t td{padding:4px 5px;border-bottom:1px solid #DDE2E5;font-size:10px;vertical-align:top;color:var(--ink)}.rp .t tr:nth-child(even) td{background:var(--rpn)}.rp .t td:nth-child(-n+2){white-space:nowrap}.rp .t td.n,.rp .t th.n{text-align:right}
+.rp .dl.up{color:var(--r);font-weight:700}.rp .dl.dn{color:var(--g);font-weight:700}
+.rp .sign{display:flex;gap:30px;margin-top:16px}.rp .sign div{flex:1;border-top:1px solid var(--ink);padding-top:3px;text-align:center;color:var(--s);font-size:11px}
+.rp .foot{margin-top:10px;color:var(--s);font-size:9px;border-top:1px solid var(--rln);padding-top:3px;display:flex;justify-content:space-between;gap:10px}
+.rp svg{max-width:100%;height:auto;display:block}.rp .cap{font-size:9px;color:var(--s);margin:2px 0}
+.pbk{page-break-before:always}
+@media print{
+ @page{size:A4 landscape;margin:9mm}
+ body{background:#fff}
+ header.top,.steps,.noprint,#ajustes,section.panel:not(#p3)>*{display:none!important}
+ #p3{display:block!important}#p3>.noprint{display:none!important}
+ main{padding:0;max-width:none}.rp{border:0;padding:0;margin:0;max-width:none}
+ .rp .two,.rp .k,.rp svg,.rp .t tr{break-inside:avoid}
+}
+@media(max-width:800px){.rp .kp,.rp .two{flex-direction:column}}
+</style></head><body>
+
+<header class="top">
+  <h1><i>◆</i> TITAN · Desviaciones <small class="mono">simple v1.0</small></h1><span class="sp"></span>
+  <button class="alt" onclick="abrirAjustes()">⚙ Ajustes y respaldo</button>
+</header>
+
+<nav class="steps" id="steps">
+  <button data-p="1" class="on"><b>1</b><span><strong>Cargar</strong><br><small>Sube el Excel del inspector</small></span></button>
+  <button data-p="2"><b>2</b><span><strong>Revisar</strong><br><small>Pendientes, causas y calidad</small></span></button>
+  <button data-p="3"><b>3</b><span><strong>Informe</strong><br><small>Genera e imprime el PDF</small></span></button>
+</nav>
+
+<main>
+<!-- ================= PASO 1 ================= -->
+<section class="panel on" id="p1">
+  <div class="card">
+    <h2>Paso 1 · Cargar el Excel del inspector</h2>
+    <p class="how"><b>1.</b> Arrastra el/los archivos .xlsx (formato PGI-20036). <b>2.</b> Revisa el resumen (nuevas / actualizadas / sin cambio). <b>3.</b> Presiona <b>Confirmar carga</b>. Las desviaciones abiertas siguen vigentes hasta que un archivo posterior las cierre.</p>
+    <div class="drop" id="drop">Arrastra aquí los archivos o <button class="alt" onclick="document.getElementById('fx').click()">Seleccionar archivos</button><input type="file" id="fx" accept=".xlsx,.xlsm,.xls" multiple hidden></div>
+    <div class="bar"><button class="alt" onclick="plantilla()">⬇ Descargar plantilla Excel</button><span class="how" style="margin:0">Si tu archivo trae una columna <b>ID</b>, se usa para reconocer la desviación.</span></div>
+    <div id="prev"></div>
+  </div>
+  <div class="card li"><h2>Cargas realizadas</h2><div id="cargas"></div></div>
+  <div class="nav"><span></span><button class="btn" onclick="go(2)">Siguiente: Revisar →</button></div>
+</section>
+
+<!-- ================= PASO 2 ================= -->
+<section class="panel" id="p2">
+  <div class="card">
+    <h2>Paso 2 · Revisar</h2>
+    <p class="how">Mira el estado general, completa la <b>causa de apertura</b> y un <b>comentario</b> en los pendientes (salen impresos en el informe) y corrige lo que marque la calidad de datos.</p>
+    <div id="kp2" class="kpis"></div>
+    <div id="res2"></div>
+  </div>
+  <div class="card mg"><h2>Pendientes vigentes</h2>
+    <div class="bar">
+      <label class="f">Casino<select id="f_cas" onchange="rPend()"></select></label>
+      <label class="f">Criticidad<select id="f_crit" onchange="rPend()"><option value="">Todas</option><option>Alto</option><option>Medio</option><option>Bajo</option></select></label>
+      <label class="f">Buscar<input id="f_q" placeholder="texto…" oninput="rPend()"></label>
+      <span id="f_n" class="mono how" style="margin:0 0 6px"></span>
+    </div>
+    <div class="tw"><table class="dt"><thead><tr><th>Fecha</th><th>Días</th><th>Casino</th><th>Área</th><th>Desviación / detalle</th><th>Crit.</th><th>Responsable</th><th>Causa de apertura</th><th>Comentario</th></tr></thead><tbody id="pend"></tbody></table></div>
+  </div>
+  <div class="card am"><h2>Calidad de datos</h2><div id="cal"></div></div>
+  <div class="nav"><button class="alt" onclick="go(1)">← Cargar</button><button class="btn" onclick="go(3)">Siguiente: Informe →</button></div>
+</section>
+
+<!-- ================= PASO 3 ================= -->
+<section class="panel" id="p3">
+  <div class="card noprint">
+    <h2>Paso 3 · Generar informe</h2>
+    <p class="how">Elige el tipo, el casino y el período. Escribe conclusiones (o usa el borrador automático) y presiona <b>Generar</b>. Luego <b>Imprimir / PDF</b> (hoja A4 horizontal).</p>
+    <div class="grid">
+      <label class="f">Tipo<select id="r_tipo" onchange="tipoCambio()"><option value="m">Mensual (vs mes anterior)</option><option value="s">Semanal (vs semana anterior)</option><option value="t">Traspaso de turno (pendientes)</option></select></label>
+      <label class="f">Casino / grupo<select id="r_cas"></select></label>
+      <label class="f" id="w_mes">Mes<input type="month" id="r_mes"></label>
+      <label class="f" id="w_sem" hidden>Semana (cualquier día)<input type="date" id="r_sem"></label>
+    </div>
+    <label class="f" style="margin-top:10px">Comentarios y conclusiones (se imprimen en el informe)<textarea id="r_com" rows="4" onchange="guardarCom()" placeholder="Escribe o usa el borrador automático y edítalo."></textarea></label>
+    <div class="bar"><button class="btn mg" onclick="genRep()">Generar informe</button><button class="alt" onclick="draftCom()">Borrador automático de conclusiones</button><button class="alt" onclick="imprimir()">🖨 Imprimir / guardar PDF</button><button class="alt" onclick="expXlsx()">⬇ Exportar histórico a Excel</button></div>
+  </div>
+  <div id="report"></div>
+  <div class="nav noprint"><button class="alt" onclick="go(2)">← Revisar</button><span></span></div>
+</section>
+</main>
+
+<!-- ================= AJUSTES ================= -->
+<div id="ajustes">
+  <div class="card"><h2>Datos del contrato e informes (se guardan solos)</h2>
+    <div class="grid">
+      <label class="f">Proyecto<input id="c_proyecto"></label><label class="f">Contrato<input id="c_contrato"></label>
+      <label class="f">Código de registro<input id="c_codigo" placeholder="PGI-20036-REG-01.02.09"></label>
+      <label class="f">Fecha de corte (vacío = hoy)<input type="date" id="c_corte"></label>
+      <label class="f">Elabora<input id="c_elabora"></label><label class="f">Revisa<input id="c_revisa"></label><label class="f">Recibe<input id="c_recibe"></label>
+    </div>
+    <details><summary>Avanzado: casinos, equivalencias, causas y grupos</summary>
+      <div class="grid" style="margin-top:10px">
+        <label class="f">Casinos (uno por línea; vacío = acepta todos los del Excel)<textarea id="c_casinos" rows="6"></textarea></label>
+        <label class="f">Equivalencias: «como viene en el Excel = casino del sistema»<textarea id="c_alias" rows="6" placeholder="Comedor Cruzado Norte=OIM"></textarea></label>
+        <label class="f">Causas de apertura (una por línea)<textarea id="c_causas" rows="6"></textarea></label>
+        <label class="f">Grupos de informe: Nombre=casino1,casino2 · «*» = todos · «-X» excluye<textarea id="c_grupos" rows="6" placeholder="PMCHS=*,-Casino 4500"></textarea></label>
+      </div>
+      <div class="bar"><button class="alt" onclick="reAlias()">Reaplicar equivalencias al histórico</button></div>
+    </details>
+  </div>
+  <div class="card li"><h2>Respaldo (los datos viven en este navegador)</h2>
+    <div class="bar"><button class="btn" onclick="expJson()">Descargar respaldo JSON</button><button class="alt" onclick="document.getElementById('fj').click()">Importar y fusionar respaldo</button><input type="file" id="fj" accept=".json" hidden><button class="alt dng" onclick="borrarTodo()">Borrar todos los datos</button></div>
+    <div class="msg">Para unir datos de dos computadores: cada uno descarga su respaldo y el otro lo importa. La fusión no duplica: reconoce cada desviación por ID y conserva la versión más reciente.</div>
+  </div>
+  <div class="bar" style="max-width:980px;margin:auto"><button class="btn" onclick="cerrarAjustes()">Listo</button></div>
+</div>
+
+<script>/*__XLSX__*/</script>
+<script>
+/* =========================================================
+   TITAN · Consolidado de Desviaciones — SIMPLE
+   Estructura (léela de arriba hacia abajo):
+   A. Utilidades   B. Datos y almacenamiento   C. Lectura del Excel
+   D. Carga (paso 1)   E. Revisión (paso 2)   F. Informes (paso 3)
+   ========================================================= */
+const LOGO="__LOGO__";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- A. UTILIDADES ---------- */
+const CRIT=["Alto","Medio","Bajo"];
+const MESL=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const pad=n=>String(n).padStart(2,"0");
+const isoD=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const dObj=s=>new Date(s+"T12:00:00");
+const addD=(s,n)=>{const d=dObj(s);d.setDate(d.getDate()+n);return isoD(d)};
+const diffD=(a,b)=>Math.round((dObj(b)-dObj(a))/864e5);
+const fmt=s=>s?s.slice(8,10)+"-"+s.slice(5,7)+"-"+s.slice(0,4):"";
+const lastDay=(y,m)=>isoD(new Date(y,m,0,12));
+const mondayOf=s=>{const d=dObj(s);d.setDate(d.getDate()-((d.getDay()+6)%7));return isoD(d)};
+const norm=s=>String(s??"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/\s+/g," ").trim();
+const cap=s=>(s=String(s||"").trim())?s.charAt(0).toUpperCase()+s.slice(1).toLowerCase():"";
+const pct=(a,b)=>b?Math.round(1000*a/b)/10:null;
+const lines=s=>String(s||"").split(/\n/).map(x=>x.trim()).filter(Boolean);
+const num=n=>n.toLocaleString("es-CL");
+const today=()=>S.cfg.corte||isoD(new Date());
+const age=e=>Math.max(0,diffD(e.fo,today()));
+const openAt=(e,t)=>e.fo<=t&&(e.est==="Abierto"||(e.fc&&e.fc>t)); // ¿estaba abierta a la fecha t?
+const topN=(o,n)=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,n);
+function dl(name,blob){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+function h36(s){let a=5381,b=52711;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);a=((a<<5)+a)^c;b=((b<<5)+b)^c}return(Math.abs(a).toString(36)+Math.abs(b).toString(36)).slice(0,8).toUpperCase()}
+const validISO=s=>{const d=new Date(s+"T12:00:00");return!isNaN(d)&&isoD(d)===s?s:""}; // descarta fechas imposibles (31/02, mes 13…)
+function toISO(v){ // acepta Date, serial Excel, "2026-11-03", "03/11/2026"
+  if(v==null||v==="")return"";
+  if(v instanceof Date)return isNaN(v)?"":isoD(new Date(v.getTime()+432e5)); // +12h evita el corrimiento de zona horaria
+  if(typeof v==="number")return isoD(new Date(Math.round((v-25569)*864e5)+432e5));
+  const t=String(v).trim();let m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m)return validISO(m[1]+"-"+pad(m[2])+"-"+pad(m[3]));
+  m=t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if(m){let y=+m[3];if(y<100)y+=2000;return validISO(y+"-"+pad(m[2])+"-"+pad(m[1]))}
+  return"";
+}
+
+/* ---------- B. DATOS Y ALMACENAMIENTO ---------- */
+const KEY="titan_desv_simple_v1";
+const DEF={cfg:{proyecto:"Proyecto Carén",contrato:"",codigo:"",corte:"",elabora:"",revisa:"",recibe:"",casinos:"",alias:"",grupos:"",
+  causas:"Falta de materiales\nFalta de personal de mantención\nEmergencia en campamento\nRespuesta de proveedor / calidad\nOtra"},items:[],cargas:[],coms:{}};
+let S=JSON.parse(JSON.stringify(DEF)),PLAN=null;
+function cargar(){try{const j=JSON.parse(localStorage.getItem(KEY)||"null");if(j&&j.items)S={...DEF,...j,cfg:{...DEF.cfg,...j.cfg}}}catch(e){}}
+function guardar(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){alert("No se pudo guardar en el navegador (¿modo privado o disco lleno?). Descarga un respaldo JSON.")}}
+const casinosCfg=()=>lines(S.cfg.casinos);
+const causas=()=>lines(S.cfg.causas);
+const allCas=()=>[...new Set([...casinosCfg(),...S.items.map(e=>e.casino)])].sort();
+function grupos(){const g={};lines(S.cfg.grupos).forEach(l=>{const i=l.indexOf("=");if(i>0)g[l.slice(0,i).trim()]=l.slice(i+1).split(",").map(x=>x.trim()).filter(Boolean)});
+  if(!g["Todos los casinos"]&&allCas().length>1)g["Todos los casinos"]=["*"];return g}
+function members(name){const g=grupos()[name];if(!g)return[name];const inc=[],exc=[];
+  g.forEach(x=>{if(x==="*")inc.push(...allCas());else if(x[0]==="-")exc.push(norm(x.slice(1)));else inc.push(x)});
+  return[...new Set(inc)].filter(x=>!exc.includes(norm(x)))}
+const selFn=name=>{if(!name)return()=>true;const s=new Set(members(name));return e=>s.has(e.casino)};
+const casOpts=()=>[...new Set([...Object.keys(grupos()),...allCas()])];
+
+/* ---------- C. LECTURA DEL EXCEL ---------- */
+// Nombres de columna aceptados (se comparan sin tildes ni mayúsculas)
+const HK={fecha:["fecha observacion","fecha obs","fecha"],casino:["casino / comedor","casino/comedor","casino","comedor"],area:["area"],desv:["desviacion"],det:["detalle"],
+  acc:["accion propuesta","accion"],normat:["normativa aplicada","normativa"],crit:["criticidad"],fc:["fecha de cierre","fecha cierre"],
+  resp:["responsable del cierre","responsable"],est:["estatus","estado"],id:["id","id desviacion"]};
+function parseSheet(ws){
+  const t=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  let h=-1;for(let i=0;i<Math.min(t.length,40);i++)if((t[i]||[]).some(c=>["casino / comedor","casino/comedor","casino","comedor"].includes(norm(c)))){h=i;break}
+  if(h<0)return null;
+  const col={};t[h].forEach((c,i)=>{const n=norm(c);if(n)for(const k in HK)if(col[k]==null&&HK[k].includes(n))col[k]=i});
+  if(col.fecha==null||col.fecha===col.casino)col.fecha=col.casino-1; // la fecha va justo antes del casino
+  if(col.fecha<0)return null;
+  const rows=[];
+  for(let i=h+1;i<t.length;i++){const r=t[i];if(!r||!r.some(c=>c!=null&&String(c).trim()!==""))continue;
+    const g=k=>col[k]==null?null:r[col[k]];
+    rows.push({n:i+1,fo:g("fecha"),casino:g("casino"),area:g("area"),desv:g("desv"),det:g("det"),acc:g("acc"),normat:g("normat"),crit:g("crit"),fc:g("fc"),resp:g("resp"),est:g("est"),id:g("id")})}
+  return rows;
+}
+async function leerArchivos(files){
+  const out=[];
+  for(const f of files){
+    try{const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});let rows=null,sheet="";
+      for(const sn of wb.SheetNames){const r=parseSheet(wb.Sheets[sn]);if(r){rows=r;sheet=sn;break}}
+      out.push(rows?{name:f.name,sheet,rows}:{name:f.name,err:"No encontré la columna «CASINO / COMEDOR». ¿Es el formato PGI-20036?"});
+    }catch(e){out.push({name:f.name,err:"No se pudo leer el archivo: "+e.message})}
+  }
+  return out;
+}
+// Casino tal como viene → casino del sistema (equivalencias de Ajustes, lista de casinos, o el nombre ya usado)
+function aliasMap(){const m={};lines(S.cfg.alias).forEach(l=>{const i=l.lastIndexOf("=");if(i>0)m[norm(l.slice(0,i))]=l.slice(i+1).trim()});casinosCfg().forEach(c=>{if(!m[norm(c)])m[norm(c)]=c});return m}
+function canon(raw,am,known){const r=String(raw||"").trim(),n=norm(r);return am[n]||known[n]||r}
+// Valida y normaliza UNA fila del Excel. Los problemas van a "q" (calidad de datos).
+function normRow(r,am,known){
+  const a={q:[]};
+  a.fo=toISO(r.fo);if(!a.fo)a.q.push("fecha de observación inválida");
+  a.casino=canon(r.casino,am,known);
+  if(!a.casino)a.q.push("sin casino");else if(casinosCfg().length&&!casinosCfg().some(c=>norm(c)===norm(a.casino)))a.q.push("casino no reconocido: "+a.casino);
+  a.area=String(r.area||"").trim();a.desv=String(r.desv||"").trim();a.det=String(r.det||"").trim();a.acc=String(r.acc||"").trim();a.normat=String(r.normat||"").trim();
+  const c=cap(r.crit);a.crit=CRIT.includes(c)?c:"";if(!a.crit)a.q.push("criticidad no válida");
+  const e=norm(r.est);a.est=e.startsWith("cerr")?"Cerrado":e.startsWith("abier")?"Abierto":"";if(!a.est)a.q.push("estatus no válido");
+  a.fc=toISO(r.fc);if(r.fc&&!a.fc)a.q.push("fecha de cierre ilegible");
+  if(a.est==="Cerrado"&&!a.fc)a.q.push("cerrada sin fecha de cierre");
+  if(a.fc&&a.fo&&a.fc<a.fo)a.q.push("cierre anterior a la observación");
+  if(a.est==="Abierto"&&a.fc)a.q.push("abierta con fecha de cierre");
+  a.resp=cap(r.resp);a.idExt=r.id?String(r.id).trim():"";
+  a.skip=!a.fo||!a.casino||!(a.det||a.desv);
+  return a;
+}
+// Claves para reconocer una desviación ya cargada
+const keyOf=e=>e.fo+"|"+norm(e.casino)+"|"+norm(e.area)+"|"+norm(e.desv)+"|"+norm(e.det).slice(0,140);
+const fk=e=>e.fo+"|"+norm(e.casino)+"|"+norm(e.area)+"|"+norm(e.desv);
+const toks=s=>new Set(norm(s).split(" ").filter(x=>x.length>2));
+function jac(a,b){const A=toks(a),B=toks(b);if(!A.size&&!B.size)return 1;let n=0;A.forEach(x=>{if(B.has(x))n++});return n/(A.size+B.size-n)}
+
+/* ---------- D. CARGA (PASO 1) ---------- */
+// Analiza qué pasaría al cargar (nada se guarda hasta confirmar)
+function analizar(files){
+  const am=aliasMap(),known={};S.items.forEach(e=>known[norm(e.casino)]=e.casino);
+  const byId=new Map(S.items.map(e=>[e.id,e])),byExt=new Map(S.items.filter(e=>e.idExt).map(e=>[e.idExt,e])),byFk=new Map();
+  S.items.forEach(e=>{const k=fk(e);(byFk.get(k)||byFk.set(k,[]).get(k)).push(e)});
+  const usados=new Set(),nuevos=new Set(),plan={files:[],q:[],reab:0,t:{n:0,nueva:0,act:0,igual:0,omit:0}};
+  for(const f of files){
+    const F={name:f.name,sheet:f.sheet,err:f.err,items:[],n:0,nueva:0,act:0,igual:0,omit:0};plan.files.push(F);if(!f.rows)continue;
+    const dup={};
+    for(const raw of f.rows){
+      const o=normRow(raw,am,known);F.n++;
+      if(o.skip){F.omit++;plan.q.push({f:f.name,row:raw.n,m:"fila omitida: "+(o.q.filter(x=>/fecha de obs|sin casino/.test(x)).join(", ")||"sin detalle")});continue}
+      o.q.forEach(m=>plan.q.push({f:f.name,row:raw.n,m}));
+      let k=keyOf(o);dup[k]=(dup[k]||0)+1;o.id="D-"+h36(dup[k]>1?k+"#"+dup[k]:k);
+      let ex=byId.get(o.id)||(o.idExt&&byExt.get(o.idExt));
+      if(!ex){const c=(byFk.get(fk(o))||[]).filter(e=>!usados.has(e.id)&&jac(e.det,o.det)>=.8);if(c.length)ex=c.sort((a,b)=>jac(b.det,o.det)-jac(a.det,o.det))[0]}
+      if(ex){usados.add(ex.id);const ch=[];
+        if(ex.est==="Cerrado"&&o.est==="Abierto"){ch.push("REABIERTA");plan.reab++;o.reab=true}
+        else if(ex.est!==o.est)ch.push("estatus "+ex.est+" → "+o.est);
+        if((ex.fc||"")!==(o.fc||"")&&o.fc)ch.push("fecha de cierre "+fmt(o.fc));
+        if(o.resp&&ex.resp!==o.resp)ch.push("responsable "+o.resp);
+        if(o.crit&&ex.crit!==o.crit)ch.push("criticidad "+ex.crit+" → "+o.crit);
+        if(o.acc&&ex.acc!==o.acc)ch.push("acción propuesta");
+        F.items.push({o,ex,ch,a:ch.length?"act":"igual"});ch.length?F.act++:F.igual++;
+      }else{F.items.push({o,a:"nueva"});nuevos.add(o.id);F.nueva++}
+    }
+    ["n","nueva","act","igual","omit"].forEach(k=>plan.t[k]+=F[k]);
+  }
+  return plan;
+}
+async function alSubir(files){
+  files=[...files];if(!files.length)return;
+  $("prev").innerHTML='<div class="msg">Leyendo y analizando '+files.length+' archivo(s)…</div>';
+  const leidos=await leerArchivos(files);await new Promise(r=>setTimeout(r,20));
+  PLAN=analizar(leidos);rPrev();
+}
+function rPrev(){
+  const P=PLAN;if(!P){$("prev").innerHTML="";return}
+  let h='<div class="kpis"><div class="g"><b>'+P.t.nueva+'</b><span>nuevas</span></div><div class="w"><b>'+P.t.act+'</b><span>actualizadas</span></div><div><b>'+P.t.igual+'</b><span>sin cambio</span></div><div class="r"><b>'+P.t.omit+'</b><span>omitidas</span></div></div>';
+  P.files.forEach(f=>{h+=f.err?'<div class="msg bad"><b>'+esc(f.name)+':</b> '+esc(f.err)+'</div>':'<div class="msg ok"><b>'+esc(f.name)+'</b> · hoja «'+esc(f.sheet)+'» · '+f.n+' filas: '+f.nueva+' nuevas, '+f.act+' actualizadas, '+f.igual+' sin cambio, '+f.omit+' omitidas</div>'});
+  const cambios=P.files.flatMap(f=>f.items.filter(i=>i.a==="act"));
+  if(P.reab)h+='<div class="msg bad"><b>'+P.reab+' desviación(es) REABIERTAS</b> (estaban cerradas y el archivo las trae abiertas). Revisa antes de confirmar.</div>';
+  if(cambios.length)h+='<details open><summary>Ver cambios ('+cambios.length+')</summary><div class="tw"><table class="dt"><tr><th>ID</th><th>Casino</th><th>Detalle</th><th>Cambios</th></tr>'+cambios.slice(0,60).map(i=>'<tr><td>'+i.ex.id+'</td><td>'+esc(i.o.casino)+'</td><td>'+esc(i.o.det.slice(0,90))+'</td><td>'+esc(i.ch.join("; "))+'</td></tr>').join("")+'</table></div></details>';
+  if(P.q.length)h+='<details><summary>Observaciones de calidad ('+P.q.length+')</summary><div class="msg"><ul>'+P.q.slice(0,40).map(q=>'<li>'+esc(q.f)+(q.row?' fila '+q.row:'')+': '+esc(q.m)+'</li>').join("")+(P.q.length>40?'<li>… y '+(P.q.length-40)+' más</li>':'')+'</ul></div></details>';
+  h+='<div class="bar"><button class="btn" onclick="confirmar()" '+(P.t.nueva+P.t.act?"":"disabled")+'>✔ Confirmar carga</button><button class="alt" onclick="PLAN=null;rPrev()">Cancelar</button></div>';
+  $("prev").innerHTML=h;
+}
+function confirmar(){
+  const P=PLAN;if(!P)return;const now=Date.now();let total=0;
+  for(const F of P.files){if(!F.items.length)continue;const cid="C-"+now.toString(36)+total;let nueva=0,act=0;
+    for(const it of F.items){const o=it.o;
+      if(it.a==="nueva"){S.items.push({id:o.id,idExt:o.idExt,fo:o.fo,casino:o.casino,area:o.area,desv:o.desv,det:o.det,acc:o.acc,normat:o.normat,crit:o.crit,fc:o.fc,resp:o.resp,est:o.est,causa:"",com:"",upd:now,c0:cid});nueva++}
+      else if(it.a==="act"){const u=S.items.find(e=>e.id===it.ex.id);if(!u)continue;
+        if(o.est)u.est=o.est;if(o.reab)u.fc="";else if(o.fc)u.fc=o.fc;
+        if(o.resp)u.resp=o.resp;if(o.crit)u.crit=o.crit;if(o.acc)u.acc=o.acc;if(!u.idExt&&o.idExt)u.idExt=o.idExt;u.upd=now;act++}
+    }
+    S.cargas.push({id:cid,archivo:F.name,t:now,n:F.n,nueva,act,igual:F.igual,omit:F.omit});total++;
+  }
+  guardar();PLAN=null;
+  $("prev").innerHTML='<div class="msg ok"><b>Carga confirmada.</b> Ya puedes pasar a revisar.</div><div class="bar"><button class="btn" onclick="go(2)">Siguiente: Revisar →</button></div>';
+  fillSel();rCargas();
+}
+function rCargas(){
+  $("cargas").innerHTML=S.cargas.length?'<div class="tw"><table class="dt"><tr><th>Fecha</th><th>Archivo</th><th>Filas</th><th>Nuevas</th><th>Actualizadas</th><th>Sin cambio</th><th>Omitidas</th></tr>'+S.cargas.slice().reverse().slice(0,30).map(c=>'<tr><td>'+new Date(c.t).toLocaleString("es-CL")+'</td><td>'+esc(c.archivo)+'</td><td>'+c.n+'</td><td>'+c.nueva+'</td><td>'+c.act+'</td><td>'+c.igual+'</td><td>'+c.omit+'</td></tr>').join("")+'</table></div>':'<p class="how">Aún no hay cargas.</p>';
+}
+function plantilla(){
+  const H=["FECHA OBSERVACIÓN","CASINO / COMEDOR","AREA","DESVIACIÓN","DETALLE","ACCION PROPUESTA","NORMATIVA APLICADA","CRITICIDAD","FECHA DE CIERRE","RESPONSABLE DEL CIERRE","ESTATUS","ID"];
+  const ws=XLSX.utils.aoa_to_sheet([H,[new Date(),"Nombre del casino","Cocina","Tipo de desviación","Descripción de lo observado","Qué se propone hacer","DS 977","Medio","","Nombre responsable","Abierto",""]],{cellDates:true});
+  ws["!cols"]=[16,20,16,24,50,30,20,11,16,22,10,12].map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Desviaciones");
+  dl("Plantilla_Desviaciones.xlsx",new Blob([XLSX.write(wb,{type:"array",bookType:"xlsx",cellDates:true})],{type:"application/octet-stream"}));
+}
+
+/* ---------- E. REVISIÓN (PASO 2) ---------- */
+function qual(e){const t=[];
+  if(casinosCfg().length&&!casinosCfg().some(c=>norm(c)===norm(e.casino)))t.push("casino no reconocido");
+  if(!e.crit)t.push("sin criticidad");
+  if(e.est==="Cerrado"&&!e.fc)t.push("cerrada sin fecha de cierre");
+  if(e.fc&&e.fc<e.fo)t.push("cierre anterior a observación");
+  if(e.est==="Abierto"&&e.fc)t.push("abierta con fecha de cierre");return t}
+function rRevisar(){
+  const I=S.items,ab=I.filter(e=>e.est==="Abierto"),ce=I.length-ab.length,pc=pct(ce,I.length);
+  $("kp2").innerHTML='<div><b>'+num(I.length)+'</b><span>desviaciones cargadas</span></div><div class="g"><b>'+num(ce)+'</b><span>cerradas</span></div><div class="w"><b>'+num(ab.length)+'</b><span>abiertas</span></div><div class="r"><b>'+ab.filter(e=>e.crit==="Alto").length+'</b><span>abiertas criticidad alta</span></div><div><b>'+(pc==null?"n/d":pc+"%")+'</b><span>% de cierre</span></div>';
+  const cs=allCas();
+  $("res2").innerHTML=I.length?'<div class="tw"><table class="dt"><tr><th>Casino</th><th>Observadas</th><th>Cerradas</th><th>Abiertas</th><th>% cierre</th><th>Alto abiertas</th></tr>'+cs.map(c=>{const a=I.filter(e=>e.casino===c),o=a.filter(e=>e.est==="Abierto");return a.length?'<tr><td>'+esc(c)+'</td><td>'+a.length+'</td><td>'+(a.length-o.length)+'</td><td>'+o.length+'</td><td>'+pct(a.length-o.length,a.length)+'%</td><td>'+o.filter(e=>e.crit==="Alto").length+'</td></tr>':''}).join("")+'</table></div>':'<div class="msg">No hay datos. Vuelve al paso 1 y carga un Excel.</div>';
+  const q={};I.forEach(e=>qual(e).forEach(m=>q[m]=(q[m]||0)+1));const ks=Object.keys(q);
+  $("cal").innerHTML=ks.length?'<div class="msg"><ul>'+ks.map(k=>'<li>'+esc(k)+': <b>'+q[k]+'</b></li>').join("")+'</ul>Corrige el Excel de origen y vuelve a cargarlo: la versión nueva actualiza la existente (no duplica).</div>':'<div class="msg ok">Sin observaciones de calidad de datos.</div>';
+  rPend();
+}
+function rPend(){
+  const c=$("f_cas").value,k=$("f_crit").value,q=norm($("f_q").value),sel=selFn(c);
+  const L=S.items.filter(e=>e.est==="Abierto"&&sel(e)&&(!k||e.crit===k)&&(!q||norm([e.casino,e.area,e.desv,e.det,e.resp,e.com].join(" ")).includes(q)))
+    .sort((a,b)=>CRIT.indexOf(a.crit)-CRIT.indexOf(b.crit)||(a.fo<b.fo?-1:1));
+  $("f_n").textContent=L.length+" pendiente(s)"+(L.length>200?" · mostrando 200":"");
+  const cs=causas();
+  const opts=v=>'<option value=""></option>'+[...new Set([...cs,...(v?[v]:[])])].map(x=>'<option'+(x===v?' selected':'')+'>'+esc(x)+'</option>').join("");
+  $("pend").innerHTML=L.slice(0,200).map(e=>'<tr><td>'+fmt(e.fo)+'</td><td>'+age(e)+'</td><td>'+esc(e.casino)+'</td><td>'+esc(e.area)+'</td><td><b>'+esc(e.desv)+'</b><br>'+esc(e.det)+'</td><td><span class="pill '+e.crit+'">'+e.crit+'</span></td><td>'+esc(e.resp)+'</td><td><select onchange="setCampo(\''+e.id+'\',\'causa\',this.value)">'+opts(e.causa)+'</select></td><td><input value="'+esc(e.com||"")+'" onchange="setCampo(\''+e.id+'\',\'com\',this.value)"></td></tr>').join("")||'<tr><td colspan="9" class="how">Sin pendientes con este filtro.</td></tr>';
+}
+function setCampo(id,campo,v){const e=S.items.find(x=>x.id===id);if(e){e[campo]=v;e.upd=Date.now();guardar()}}
+
+/* ---------- F. INFORMES (PASO 3) ---------- */
+function period(){
+  const t=$("r_tipo").value;
+  if(t==="m"){const v=$("r_mes").value;if(!v)return null;const a=+v.slice(0,4),m=+v.slice(5),pa=m===1?a-1:a,pm=m===1?12:m-1,na=m===12?a+1:a,nm=m===12?1:m+1;
+    return{t,from:v+"-01",to:lastDay(a,m),pf:pa+"-"+pad(pm)+"-01",pt:lastDay(pa,pm),label:MESL[m-1].toUpperCase()+" "+a,plabel:MESL[pm-1].toUpperCase()+" "+pa,pk:"mes anterior",
+      nf:na+"-"+pad(nm)+"-01",nt:lastDay(na,nm),nk:MESL[nm-1][0].toUpperCase()+MESL[nm-1].slice(1)}}
+  if(t==="s"){const v=$("r_sem").value;if(!v)return null;const a=mondayOf(v),b=addD(a,6);
+    return{t,from:a,to:b,pf:addD(a,-7),pt:addD(a,-1),label:"SEMANA "+fmt(a)+" AL "+fmt(b),plabel:fmt(addD(a,-7))+" al "+fmt(addD(a,-1)),pk:"semana anterior",nf:addD(a,7),nt:addD(a,13),nk:"la semana siguiente"}}
+  return{t:"t",from:"",to:today(),label:"AL "+fmt(today())};
+}
+// Estadística de un casino/grupo en [from,to]. nt = fecha de "seguimiento" (fin del período siguiente)
+function stats(sel,from,to,nt){
+  const f=typeof sel==="function"?sel:selFn(sel),all=S.items.filter(f);
+  const obs=all.filter(e=>e.fo>=from&&e.fo<=to);
+  const cierres=all.filter(e=>e.est==="Cerrado"&&e.fc>=from&&e.fc<=to);
+  const ab=all.filter(e=>e.fo<=to&&(e.est==="Abierto"||(e.fc&&e.fc>to)));
+  const d=nt?(nt>today()?today():nt):to,p=to>today()?today():to;
+  const cp=obs.filter(e=>!openAt(e,p)).length,aN=obs.filter(e=>openAt(e,d)).length,abP=obs.filter(e=>openAt(e,p));
+  const cnt=(L,k)=>{const o={};L.forEach(e=>{const v=e[k]||"(sin dato)";o[v]=(o[v]||0)+1});return o};
+  return{obs,cierres,ab,n:obs.length,cp,pcp:pct(cp,obs.length),aN,pcN:pct(obs.length-aN,obs.length),nabP:abP.length,altoP:abP.filter(e=>e.crit==="Alto").length,
+    crit:cnt(obs,"crit"),desv:cnt(obs,"desv"),area:cnt(obs,"area"),resp:cnt(ab,"resp"),causa:cnt(ab,"causa")};
+}
+function dl2(a,b,menosEsMejor){if(a==null||b==null)return"<span>n/d</span>";const d=Math.round(10*(a-b))/10;
+  return d?'<span class="dl '+((menosEsMejor?d<0:d>0)?"up":"dn")+'">'+(d>0?"+":"")+d+'</span>':"<span>0</span>"}
+/* gráficos SVG (barras horizontales / verticales) */
+function hbars(rows,la,lb,W){W=W||560;const lw=210,bw=W-lw-40,mx=Math.max(1,...rows.map(r=>Math.max(r.a,r.b||0))),rh=lb?30:20,H=rows.length*rh+26;
+  let s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" font-family="Roboto,Arial" font-size="10">';
+  rows.forEach((r,i)=>{const y=i*rh+4;s+='<text x="0" y="'+(y+11)+'" fill="#0B1014">'+esc(r.l.length>38?r.l.slice(0,37)+"…":r.l)+'</text><rect x="'+lw+'" y="'+y+'" width="'+(r.a/mx*bw)+'" height="11" fill="#E55302"/><text x="'+(lw+r.a/mx*bw+4)+'" y="'+(y+9)+'" fill="#36424A">'+r.a+'</text>';
+    if(lb)s+='<rect x="'+lw+'" y="'+(y+12)+'" width="'+((r.b||0)/mx*bw)+'" height="9" fill="#8FA1AB"/><text x="'+(lw+(r.b||0)/mx*bw+4)+'" y="'+(y+20)+'" fill="#36424A">'+(r.b||0)+'</text>'});
+  const y=H-10;s+='<rect x="0" y="'+(y-8)+'" width="9" height="9" fill="#E55302"/><text x="13" y="'+y+'">'+esc(la)+'</text>';
+  if(lb)s+='<rect x="130" y="'+(y-8)+'" width="9" height="9" fill="#8FA1AB"/><text x="143" y="'+y+'">'+esc(lb)+'</text>';return s+"</svg>"}
+function vcols(groups,names,cols,W,H){W=W||560;H=H||170;const n=groups.length,mx=Math.max(1,...groups.flatMap(g=>g.v)),gw=(W-20)/n,k=names.length,bw=Math.min(26,(gw-10)/k),base=H-34;
+  let s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" font-family="Roboto,Arial" font-size="10"><line x1="10" x2="'+(W-10)+'" y1="'+base+'" y2="'+base+'" stroke="#C9D0D4"/>';
+  groups.forEach((g,i)=>{const x0=10+i*gw+(gw-bw*k)/2;g.v.forEach((v,j)=>{const h=v/mx*(base-16);s+='<rect x="'+(x0+j*bw)+'" y="'+(base-h)+'" width="'+(bw-2)+'" height="'+h+'" fill="'+cols[j]+'"/><text x="'+(x0+j*bw+(bw-2)/2)+'" y="'+(base-h-3)+'" text-anchor="middle" fill="#36424A">'+v+'</text>'});
+    s+='<text x="'+(10+i*gw+gw/2)+'" y="'+(base+13)+'" text-anchor="middle" fill="#0B1014">'+esc(g.l)+'</text>'});
+  names.forEach((nm,j)=>{s+='<rect x="'+(10+130*j)+'" y="'+(H-12)+'" width="9" height="9" fill="'+cols[j]+'"/><text x="'+(23+130*j)+'" y="'+(H-4)+'">'+esc(nm)+'</text>'});return s+"</svg>"}
+function buckets(sel,P){const A=S.items.filter(selFn(sel)),B=[];
+  if(P.t==="s")for(let i=0;i<7;i++){const d=addD(P.from,i);B.push({l:["Lu","Ma","Mi","Ju","Vi","Sá","Do"][i]+" "+d.slice(8),f:d,t:d})}
+  else{let f=P.from,i=1;while(f<=P.to){let t=addD(mondayOf(f),6);if(t>P.to)t=P.to;B.push({l:"Sem "+i+" ("+f.slice(8)+"-"+t.slice(8)+")",f,t});f=addD(t,1);i++}}
+  return B.map(b=>({l:b.l,v:[A.filter(e=>e.fo>=b.f&&e.fo<=b.t).length,A.filter(e=>e.est==="Cerrado"&&e.fc>=b.f&&e.fc<=b.t).length]}))}
+
+const comKey=()=>{const p=period();return p?$("r_tipo").value+"|"+$("r_cas").value+"|"+p.from:""};
+function cargarCom(){const k=comKey();$("r_com").value=(S.coms[k]||{}).v||""}
+function guardarCom(){const k=comKey();if(k){S.coms[k]={v:$("r_com").value,u:Date.now()};guardar()}}
+function tipoCambio(){const t=$("r_tipo").value;$("w_mes").hidden=t!=="m";$("w_sem").hidden=t!=="s";cargarCom()}
+const cz=e=>e.causa||"";
+function draftCom(){
+  const P=period();if(!P||P.t==="t"){alert("Selecciona el mes o la semana.");return}
+  const c=$("r_cas").value,a=stats(c,P.from,P.to),b=stats(c,P.pf,P.pt);
+  if(!a.n&&!a.ab.length){$("r_com").value="Sin registros en el período evaluado.";return}
+  const m=P.t==="m",art=m?"el ":"la ";
+  let s="En "+(m?"el mes de "+P.label.toLowerCase():"la "+P.label.toLowerCase())+" se registraron "+a.n+" desviaciones en "+c+", de las cuales "+a.cp+" quedaron cerradas en el período ("+(a.pcp==null?"n/d":a.pcp+"%")+" de cierre).";
+  s+=b.n?" En "+art+P.pk+" se registraron "+b.n+" ("+(a.n-b.n>=0?"+":"")+(a.n-b.n)+" en la comparación)." :" No hay registros en "+art+P.pk+" para comparar.";
+  s+=" Al término del período siguen abiertas "+a.nabP+" de las observadas"+(a.altoP?", "+a.altoP+" de criticidad Alta":"")+(a.ab.length>a.nabP?"; además continúan abiertas "+(a.ab.length-a.nabP)+" de períodos anteriores":"")+".";
+  const d=topN(a.desv,1)[0],ar=topN(a.area,1)[0];if(d)s+=" El tipo de desviación más frecuente fue «"+d[0]+"» ("+d[1]+")"+(ar?" y el área con más observaciones, «"+ar[0]+"» ("+ar[1]+")":"")+".";
+  const ca=topN(a.causa,3).filter(x=>x[0]!=="(sin dato)");if(ca.length)s+=" Las abiertas se asocian a: "+ca.map(x=>x[0].toLowerCase()+" ("+x[1]+")").join(", ")+".";
+  $("r_com").value=s;guardarCom();
+}
+function imprimir(){$("report").innerHTML?window.print():alert("Primero genera el informe.")}
+
+function genRep(){
+  const P=period(),cas=$("r_cas").value;
+  if(!P){alert("Selecciona el mes o la semana.");return}
+  if(!cas){alert("Selecciona el casino.");return}
+  guardarCom();
+  const sel=selFn(cas),mem=members(cas),multi=mem.length>1,cfg=S.cfg,com=$("r_com").value.trim();
+  const head=t=>'<div class="hd"><img src="'+LOGO+'"><div class="hm"><div class="mono"><i>◆</i> WORKMATE · GREAT PEOPLE BUILDING TOGETHER</div><h1>'+t+'</h1></div></div><div class="sub">Contrato: '+esc(cfg.proyecto)+(cfg.contrato?" · N° "+esc(cfg.contrato):"")+" · Ámbito: <b>"+esc(cas)+"</b>"+(multi?" (incluye "+esc(mem.join(", "))+")":"")+" · Período: <b>"+esc(P.label)+"</b>"+(P.plabel?" (comparativo vs "+esc(P.plabel)+")":"")+(cfg.codigo?" · Código "+esc(cfg.codigo):"")+"</div>";
+  const foot='<div class="foot"><span>TITAN-NEXUS · Consolidado de desviaciones · Emitido '+fmt(isoD(new Date()))+' · © 2026 Rodrigo Avilés Lazcano · Fuente: reportes de inspección cargados ('+S.cargas.length+' cargas)</span><span>'+esc(cas)+' · '+esc(P.label)+'</span></div>';
+  const sign=(a,b,c)=>'<div class="sign"><div>'+a+'<br><b>'+esc(cfg.elabora)+'</b></div><div>'+b+'<br><b>'+esc(cfg.revisa)+'</b></div><div>'+c+'<br><b>'+esc(cfg.recibe)+'</b></div></div>';
+  const kp=(v,l)=>'<div class="k"><b>'+v+'</b><span>'+l+'</span></div>';
+  const ordC=(a,b)=>CRIT.indexOf(a.crit)-CRIT.indexOf(b.crit)||(a.fo<b.fo?-1:1);
+
+  /* ---- Traspaso de turno ---- */
+  if(P.t==="t"){
+    const pen=S.items.filter(e=>sel(e)&&e.est==="Abierto").sort(ordC),rec=S.items.filter(e=>sel(e)&&e.est==="Cerrado"&&e.fc>=addD(P.to,-7)&&e.fc<=P.to);
+    $("report").innerHTML='<div class="rp">'+head("HOJA DE TRASPASO DE TURNO — PENDIENTES")+'<div class="kp">'+kp(pen.length,"pendientes vigentes")+kp(pen.filter(e=>e.crit==="Alto").length,"criticidad Alta")+kp(pen.filter(e=>age(e)>30).length,"con más de 30 días")+kp(rec.length,"cerradas en los últimos 7 días")+'</div><h3>Pendientes que continúan en el turno siguiente</h3>'+
+      (pen.length?'<table class="t"><tr><th>ID</th>'+(multi?"<th>Casino</th>":"")+'<th>Fecha</th><th class="n">Días</th><th>Área</th><th>Desviación</th><th>Detalle</th><th>Crit.</th><th>Responsable</th><th>Causa / comentario</th><th>Observación del turno entrante</th></tr>'+
+        pen.map(e=>'<tr><td>'+e.id+'</td>'+(multi?'<td>'+esc(e.casino)+'</td>':'')+'<td>'+fmt(e.fo)+'</td><td class="n">'+age(e)+'</td><td>'+esc(e.area)+'</td><td>'+esc(e.desv)+'</td><td>'+esc(e.det)+'</td><td>'+e.crit+'</td><td>'+esc(e.resp)+'</td><td>'+esc([cz(e),e.com].filter(Boolean).join(" · "))+'</td><td style="width:16%"></td></tr>').join("")+'</table>':'<div class="sum">Sin pendientes vigentes en el casino.</div>')+
+      (com?'<h3>Comentarios</h3><div class="sum">'+esc(com)+'</div>':'')+sign("Entrega (inspector / supervisor saliente)","Recibe (inspector / supervisor entrante)","V°B° Workmate")+foot+'</div>';
+    return;
+  }
+
+  /* ---- Mensual / semanal ---- */
+  const p=stats(cas,P.from,P.to,P.nt),f=stats(cas,P.pf,P.pt,P.to),hayAnt=f.n+f.cierres.length>0,hoy=today();
+  let b=P.nk,g="";
+  if(P.nt>=hoy){b=P.nf>hoy?(P.t==="m"?P.label.split(" ")[0][0]+P.label.split(" ")[0].slice(1).toLowerCase()+", mes en curso":"la semana en curso"):P.nk+(P.t==="m"?", mes en curso":" (en curso)")}
+  if(P.nt>hoy)g=" · al corte "+fmt(hoy);
+  const x=P.to>hoy?hoy:P.to; // fecha efectiva de medición
+  const fila=(lab,cur,ant,menosEsMejor,suf)=>'<tr><td>'+lab+'</td><td class="n">'+(hayAnt?(ant==null?"n/d":ant+(suf||"")):"Sin registros")+'</td><td class="n"><b>'+(cur==null?"n/d":cur+(suf||""))+'</b></td><td class="n">'+(hayAnt?dl2(cur,ant,menosEsMejor):"n/d")+'</td></tr>';
+  const comp='<table class="t"><tr><th>Métrica de control</th><th class="n">'+esc(P.plabel)+'</th><th class="n">'+esc(P.label)+'</th><th class="n">Variación</th></tr>'+
+    fila("Desviaciones del período",p.n,f.n,false)+fila("Desviaciones cerradas en el período",p.cp,f.cp,true)+fila("% de cierre del período",p.pcp,f.pcp,true,"%")+
+    fila("Criticidad Alta observada",p.crit.Alto||0,f.crit.Alto||0,false)+fila("Criticidad Media observada",p.crit.Medio||0,f.crit.Medio||0,false)+fila("Criticidad Baja observada",p.crit.Bajo||0,f.crit.Bajo||0,false)+
+    fila("Abiertas al término del período (de las observadas en él)",p.nabP,f.nabP,false)+
+    fila("Abiertas al término de "+b+" (de las observadas en el período)"+g,p.aN,f.aN,false)+
+    fila("Cierre al término de "+b+" (de las observadas en el período)"+g,p.pcN,f.pcN,true,"%")+'</table>';
+  const tipos=[...new Set([...Object.keys(p.desv),...Object.keys(f.desv)])].map(k=>({l:k,a:p.desv[k]||0,b:f.desv[k]||0})).sort((a,c)=>c.a+c.b-(a.a+a.b)).slice(0,8);
+  const critG=CRIT.map(k=>({l:k,v:[p.crit[k]||0,f.crit[k]||0]})),evol=buckets(cas,P);
+  const areas=topN(p.area,8).map(e=>({l:e[0],a:e[1]})),resps=topN(p.resp,6).map(e=>({l:e[0],a:e[1]})),caus=topN(p.causa,6).map(e=>({l:e[0]==="(sin dato)"?"Sin causa registrada":e[0],a:e[1]}));
+  let porCas="";
+  if(multi){const R=mem.map(m=>{const s=e=>e.casino===m;return{m,a:stats(s,P.from,P.to),b:stats(s,P.pf,P.pt)}}).filter(r=>r.a.n+r.a.ab.length+r.b.n>0);
+    porCas='<h3>Desglose por casino</h3><table class="t"><tr><th>Casino</th><th class="n">Observadas ('+esc(P.plabel)+')</th><th class="n">Observadas ('+esc(P.label)+')</th><th class="n">Variación</th><th class="n">Cerradas</th><th class="n">% cierre</th><th class="n">Abiertas al término</th><th class="n">Alto abiertas</th></tr>'+
+      R.map(r=>'<tr><td>'+esc(r.m)+'</td><td class="n">'+r.b.n+'</td><td class="n"><b>'+r.a.n+'</b></td><td class="n">'+dl2(r.a.n,r.b.n,false)+'</td><td class="n">'+r.a.cp+'</td><td class="n">'+(r.a.pcp==null?"n/d":r.a.pcp+"%")+'</td><td class="n">'+r.a.nabP+'</td><td class="n">'+r.a.altoP+'</td></tr>').join("")+'</table>'}
+  const hdr=(extra)=>'<tr><th>ID</th>'+(multi?'<th>Casino</th>':'')+'<th>Fecha</th><th>Área</th><th>Desviación</th><th>Detalle</th><th>Crit.</th><th>Responsable</th>'+(extra?'<th>'+extra+'</th>':'')+'<th>Estado al término</th><th>Causa / comentario</th></tr>';
+  const fil=(e,extra)=>'<tr><td>'+e.id+'</td>'+(multi?'<td>'+esc(e.casino)+'</td>':'')+'<td>'+fmt(e.fo)+'</td><td>'+esc(e.area)+'</td><td>'+esc(e.desv)+'</td><td>'+esc(e.det)+'</td><td>'+e.crit+'</td><td>'+esc(e.resp)+'</td>'+(extra?'<td>'+extra+'</td>':'')+'<td>'+(openAt(e,x)?'<b>Abierta</b>':'Cerrada '+(e.fc?fmt(e.fc):'(sin fecha)'))+'</td><td>'+esc([cz(e),e.com].filter(Boolean).join(" · "))+'</td></tr>';
+
+  // Lámina: gestión de cierre de las abiertas del período anterior
+  const ant=S.items.filter(e=>sel(e)&&openAt(e,P.pt)).sort((a,c)=>openAt(c,x)-openAt(a,x)||ordC(a,c)),sigue=ant.filter(e=>openAt(e,x)).length,cerr=ant.length-sigue;
+  const L3='<div class="rp pbk">'+head("GESTIÓN DE CIERRE DE DESVIACIONES ABIERTAS DEL PERÍODO ANTERIOR")+'<div class="kp">'+kp(ant.length,"abiertas al término de "+esc(P.plabel))+kp(cerr,"cerradas en el período")+kp(sigue,"siguen abiertas")+kp(ant.length?pct(cerr,ant.length)+"%":"n/d","% de gestión de cierre")+'</div>'+
+    (ant.length?'<table class="t">'+hdr()+ant.slice(0,60).map(e=>fil(e)).join("")+'</table>'+(ant.length>60?'<div class="cap">Se listan 60 de '+ant.length+' (primero las que siguen abiertas, por criticidad y antigüedad).</div>':''):'<div class="sum">Sin desviaciones abiertas al término del período anterior.</div>')+foot+'</div>';
+  // Lámina: criticidad alta y elementos extraños
+  const ee=e=>/elemento\s+extra/i.test(e.desv||""),V=p.obs.filter(e=>e.crit==="Alto"),H=p.obs.filter(ee),B=p.obs.filter(e=>e.crit==="Alto"||ee(e)).sort((a,c)=>openAt(c,x)-openAt(a,x)||ordC(a,c));
+  const L4='<div class="rp pbk">'+head("DESVIACIONES DE CRITICIDAD ALTA Y ELEMENTOS EXTRAÑOS")+'<div class="kp">'+kp(V.length,"de criticidad Alta observadas")+kp(V.filter(e=>openAt(e,x)).length,"Alta abiertas al término")+kp(H.length,"elementos extraños observados")+kp(H.filter(e=>openAt(e,x)).length,"elementos extraños abiertos al término")+'</div>'+
+    (B.length?'<table class="t">'+hdr("Tipo")+B.slice(0,60).map(e=>fil(e,e.crit==="Alto"&&ee(e)?"Alta y elemento extraño":e.crit==="Alto"?"Criticidad Alta":"Elemento extraño")).join("")+'</table>'+(B.length>60?'<div class="cap">Se listan 60 de '+B.length+'.</div>':''):'<div class="sum">Sin desviaciones de criticidad Alta ni elementos extraños en el período.</div>')+
+    '<div class="cap">Elemento extraño: desviaciones cuyo tipo dice «elemento extraño» en el reporte del inspector, de cualquier criticidad.</div>'+foot+'</div>';
+  // Lámina: abiertas al término del período
+  const T=p.obs.filter(e=>openAt(e,x)).sort(ordC);
+  const L5='<div class="rp pbk">'+head("DESVIACIONES ABIERTAS AL TÉRMINO DEL PERÍODO")+'<div class="cap" style="margin:2px 0 8px">Solo las desviaciones observadas en '+esc(P.label)+' que siguen abiertas'+(p.ab.length>T.length?". Además, "+(p.ab.length-T.length)+" de períodos anteriores continúan abiertas y se informan en la lámina de gestión de cierre.":".")+'</div>'+
+    (T.length?'<table class="t"><tr><th>ID</th>'+(multi?'<th>Casino</th>':'')+'<th>Fecha</th><th class="n">Días</th><th>Área</th><th>Desviación</th><th>Detalle</th><th>Crit.</th><th>Responsable</th><th>Causa de apertura</th><th>Comentario</th></tr>'+
+      T.slice(0,60).map(e=>'<tr><td>'+e.id+'</td>'+(multi?'<td>'+esc(e.casino)+'</td>':'')+'<td>'+fmt(e.fo)+'</td><td class="n">'+Math.max(0,diffD(e.fo,x))+'</td><td>'+esc(e.area)+'</td><td>'+esc(e.desv)+'</td><td>'+esc(e.det)+'</td><td>'+e.crit+'</td><td>'+esc(e.resp)+'</td><td>'+esc(cz(e)||"Sin causa registrada")+'</td><td>'+esc(e.com||"")+'</td></tr>').join("")+'</table>'+(T.length>60?'<div class="cap">Se listan 60 de '+T.length+' (ordenadas por criticidad y antigüedad).</div>':''):'<div class="sum">Sin desviaciones del período abiertas al término.</div>')+sign("Elabora","Revisa","Recibe")+foot+'</div>';
+
+  $("report").innerHTML=
+    '<div class="rp">'+head("INFORME "+(P.t==="m"?"MENSUAL":"SEMANAL")+' DE DESVIACIONES <span style="color:#E55302">'+esc(cas.toUpperCase())+'</span> '+esc(P.label))+
+      '<div class="kp">'+kp(p.n,"desviaciones del período")+kp(p.cp,"cerradas en el período")+kp(p.pcp==null?"n/d":p.pcp+"%","% de cierre del período")+kp(p.nabP,"abiertas al término del período")+kp(p.altoP,"abiertas de criticidad Alta")+kp(p.pcN==null?"n/d":p.pcN+"%","cierre al término de "+b+g)+'</div>'+
+      '<h3>Comentarios y conclusiones del período</h3><div class="sum">'+esc(com||"Sin comentarios registrados para el período.")+'</div>'+
+      '<h3>Análisis comparativo vs '+esc(P.pk)+'</h3>'+comp+
+      (hayAnt?'<div class="cap">Columna '+esc(P.plabel)+': las filas «al término de…» se miden al término de su propio período siguiente ('+esc(P.label)+(P.to>hoy?", al corte "+fmt(hoy):"")+'), para comparar el mismo indicador.</div>':'<div class="cap">Sin registros en el período anterior: no se calculan variaciones.</div>')+foot+'</div>'+
+    '<div class="rp pbk">'+head("ESTADÍSTICA DEL PERÍODO")+porCas+
+      '<div class="two"><div><h3>Tipo de desviación (actual vs '+esc(P.pk)+')</h3>'+(tipos.length?hbars(tipos,"Actual","Anterior"):'<div class="cap">Sin registros.</div>')+'</div><div><h3>Criticidad observada</h3>'+vcols(critG,["Actual","Anterior"],["#E55302","#8FA1AB"],420,180)+'</div></div>'+
+      '<div class="two"><div><h3>'+(P.t==="s"?"Evolución diaria":"Evolución semanal")+': observadas y cierres</h3>'+vcols(evol,["Observadas","Cierres"],["#E55302","#0098AA"],560,190)+'</div><div><h3>Áreas con más observaciones</h3>'+(areas.length?hbars(areas,"Observadas"):'<div class="cap">Sin registros.</div>')+'</div></div>'+
+      '<div class="two"><div><h3>Abiertas por responsable</h3>'+(resps.length?hbars(resps,"Abiertas"):'<div class="cap">Sin abiertas.</div>')+'</div><div><h3>Abiertas por causa de apertura</h3>'+(caus.length?hbars(caus,"Abiertas"):'<div class="cap">Sin abiertas.</div>')+'</div></div>'+foot+'</div>'+
+    L3+L4+L5;
+}
+
+/* ---------- Exportar / respaldo / ajustes ---------- */
+const CAB=["FECHA OBSERVACIÓN","CASINO / COMEDOR","AREA","DESVIACIÓN","DETALLE","ACCION PROPUESTA","NORMATIVA APLICADA","CRITICIDAD","FECHA DE CIERRE","RESPONSABLE DEL CIERRE","ESTATUS","CAUSA DE APERTURA","COMENTARIO","ID"];
+function expXlsx(){
+  if(!S.items.length){alert("No hay datos para exportar.");return}
+  const fila=e=>[e.fo?dObj(e.fo):"",e.casino,e.area,e.desv,e.det,e.acc,e.normat,e.crit,e.fc?dObj(e.fc):"",e.resp,e.est,cz(e),e.com||"",e.id];
+  const wb=XLSX.utils.book_new(),add=(nombre,L)=>{const ws=XLSX.utils.aoa_to_sheet([CAB,...L.sort((a,b)=>a.fo<b.fo?-1:1).map(fila)],{cellDates:true});ws["!cols"]=[14,20,22,26,50,24,20,10,14,18,10,28,30,12].map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,nombre.replace(/[\\\/\?\*\[\]:]/g," ").slice(0,31))};
+  add("Todas",S.items.slice());allCas().forEach(c=>{const L=S.items.filter(e=>e.casino===c);if(L.length)add(c,L)});
+  dl("Historico_Desviaciones.xlsx",new Blob([XLSX.write(wb,{type:"array",bookType:"xlsx",cellDates:true})],{type:"application/octet-stream"}));
+}
+function expJson(){dl("Respaldo_Desviaciones_"+isoD(new Date())+".json",new Blob([JSON.stringify({sistema:"TITAN-DESV-SIMPLE",v:1,cfg:S.cfg,items:S.items,cargas:S.cargas,coms:S.coms})],{type:"application/json"}))}
+async function impJson(file){
+  try{const j=JSON.parse(await file.text());if(!j||j.sistema!=="TITAN-DESV-SIMPLE"||!Array.isArray(j.items))throw new Error("no es un respaldo de esta versión");
+    const m=new Map(S.items.map(e=>[e.id,e]));let nu=0,up=0;
+    j.items.forEach(e=>{const x=m.get(e.id);if(!x){S.items.push(e);nu++}else if((e.upd||0)>(x.upd||0)){Object.assign(x,e);up++}});
+    const ids=new Set(S.cargas.map(c=>c.id));(j.cargas||[]).forEach(c=>{if(!ids.has(c.id))S.cargas.push(c)});
+    Object.keys(j.coms||{}).forEach(k=>{if(!S.coms[k]||(j.coms[k].u||0)>(S.coms[k].u||0))S.coms[k]=j.coms[k]});
+    guardar();fillSel();rCargas();alert("Fusión lista: "+nu+" nuevas, "+up+" actualizadas.")
+  }catch(e){alert("No se pudo importar: "+e.message)}
+}
+function borrarTodo(){if(confirm("Se borrarán TODOS los datos de este navegador. ¿Continuar?")&&confirm("Última confirmación: no se puede deshacer (descarga un respaldo antes).")){S=JSON.parse(JSON.stringify(DEF));guardar();location.reload()}}
+function reAlias(){const am=aliasMap();let n=0;S.items.forEach(e=>{const c=am[norm(e.casino)];if(c&&c!==e.casino){e.casino=c;n++}});guardar();fillSel();alert(n+" desviaciones reasignadas.")}
+const CF=["proyecto","contrato","codigo","corte","elabora","revisa","recibe","casinos","alias","causas","grupos"];
+function abrirAjustes(){CF.forEach(k=>$("c_"+k).value=S.cfg[k]||"");$("ajustes").style.display="block"}
+function cerrarAjustes(){CF.forEach(k=>S.cfg[k]=$("c_"+k).value.trim());guardar();$("ajustes").style.display="none";fillSel();if($("p2").classList.contains("on"))rRevisar()}
+
+/* ---------- Navegación y arranque ---------- */
+function fillSel(){
+  const set=(el,vals,vacio)=>{const v=el.value;el.innerHTML=(vacio!=null?'<option value="">'+vacio+'</option>':'')+vals.map(x=>'<option>'+esc(x)+'</option>').join("");if(vals.includes(v)||v==="")el.value=v};
+  set($("f_cas"),casOpts(),"Todos los casinos");set($("r_cas"),casOpts());
+  document.querySelectorAll("#steps button")[0].classList.toggle("done",S.cargas.length>0);
+}
+function go(n){
+  document.querySelectorAll("section.panel").forEach(s=>s.classList.toggle("on",s.id==="p"+n));
+  document.querySelectorAll("#steps button").forEach((b,i)=>b.classList.toggle("on",i+1===n));
+  if(n===1)rCargas();if(n===2)rRevisar();if(n===3){fillSel();cargarCom()}
+  scrollTo(0,0);
+}
+document.querySelectorAll("#steps button").forEach(b=>b.onclick=()=>go(+b.dataset.p));
+const drop=$("drop");
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("on")}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("on")}));
+drop.addEventListener("drop",e=>alSubir(e.dataTransfer.files));
+$("fx").onchange=e=>{alSubir(e.target.files);e.target.value=""};
+$("fj").onchange=e=>{if(e.target.files[0])impJson(e.target.files[0]);e.target.value=""};
+["r_mes","r_sem"].forEach(i=>$(i).addEventListener("change",cargarCom));$("r_cas").addEventListener("change",cargarCom);
+cargar();
+(function(){const d=new Date();$("r_mes").value=d.getFullYear()+"-"+pad(d.getMonth()+1);$("r_sem").value=isoD(d)})();
+fillSel();rCargas();
+</script>
+</body></html>
