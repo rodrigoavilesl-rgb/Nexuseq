@@ -3,6 +3,7 @@ package cl.nexus.eq.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -62,6 +63,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,6 +76,7 @@ import cl.nexus.eq.EqMath
 import cl.nexus.eq.EqRepository
 import cl.nexus.eq.Preset
 import cl.nexus.eq.Presets
+import cl.nexus.eq.SpotifyLink
 import cl.nexus.eq.TesterReport
 import kotlinx.coroutines.delay
 import kotlin.math.abs
@@ -211,6 +214,9 @@ private fun MainScreen(
             StatTile("LIMIT", if (eq.limiter) "ON" else "OFF",
                 if (eq.limiter) Neon.Lime else Neon.Dim, Modifier.weight(1f))
         }
+
+        /* ── Spotify: reproducción actual y controles (no afecta al EQ) ── */
+        SpotifyPanel()
 
         /* ── Medidores (GRAVES mide el refuerzo real: bandas bajas + Bass boost) ── */
         Panel {
@@ -549,6 +555,47 @@ private fun DriveScreen(app: AppState, hooked: Int, onExit: () -> Unit) {
 /* ═══════════ Componentes ═══════════ */
 
 /** Título con aberración cromática (acento 1 / acento 2) sobre cromo: look glitch. */
+@Composable
+private fun SpotifyPanel() {
+    val ctx = LocalContext.current
+    val now by SpotifyLink.now.collectAsStateWithLifecycle()
+    Panel {
+        Text(
+            "SPOTIFY · " + if (now.linked) "ENLAZADO" else "SIN SESIÓN",
+            color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 10.sp,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            when {
+                now.linked && now.title.isNotEmpty() -> now.title
+                now.linked -> "Reproduce algo en Spotify"
+                else -> "Activa el acceso a notificaciones para ver y controlar Spotify"
+            },
+            color = Neon.Text, fontFamily = Neon.Mono, fontSize = 13.sp,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        if (now.artist.isNotEmpty()) {
+            Text(now.artist, color = Neon.Dim, fontFamily = Neon.Mono, fontSize = 11.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.height(8.dp))
+        if (!now.linked) {
+            Chip("ACTIVAR ACCESO") {
+                ctx.startActivity(
+                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                Chip("<<") { SpotifyLink.previous() }
+                Chip(if (now.playing) "PAUSA" else "PLAY", selected = true) { SpotifyLink.playPause() }
+                Chip(">>") { SpotifyLink.next() }
+            }
+        }
+    }
+}
+
 @Composable
 private fun GlitchTitle(text: String) {
     Box {
