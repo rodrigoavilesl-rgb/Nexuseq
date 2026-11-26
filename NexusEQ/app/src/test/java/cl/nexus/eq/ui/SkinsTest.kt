@@ -12,19 +12,24 @@ class SkinsTest {
     fun skins_tienenIdsUnicos_yGrupos() {
         val ids = Skins.ALL.map { it.id }
         assertEquals(ids.size, ids.toSet().size)
-        assertEquals(13, Skins.ALL.size)
+        assertEquals(14, Skins.ALL.size)
         assertEquals(
             setOf(Skins.G_ORIG, Skins.G_ALIEN, Skins.G_PLAYER, Skins.G_SPORT),
             Skins.GROUPS.keys,
         )
         assertEquals(Skins.ALL.size, Skins.GROUPS.values.sumOf { it.size })
-        assertEquals(listOf("XEL", "COLMENA", "ACERO"), Skins.GROUPS.getValue(Skins.G_ALIEN).map { it.id })
+        assertEquals(listOf("XENO", "XEL", "COLMENA", "ACERO"), Skins.GROUPS.getValue(Skins.G_ALIEN).map { it.id })
+    }
+
+    @Test
+    fun defecto_esXeno() {
+        assertEquals(Skins.XENO, Skins.DEFAULT)
     }
 
     @Test
     fun byId_conocidaYDesconocida() {
         assertEquals(Skins.XEL, Skins.byId("XEL"))
-        assertEquals(Skins.METAL, Skins.byId("no-existe"))
+        assertEquals(Skins.DEFAULT, Skins.byId("no-existe"))
     }
 
     @Test

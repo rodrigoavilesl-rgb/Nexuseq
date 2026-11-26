@@ -258,7 +258,7 @@ data class AppState(
     val enabled: Boolean = true,
     val globalMode: Boolean = false,
     val testerMode: Boolean = false,   // MARAKES TESTER MODE: muestra diagnóstico y reporte
-    val skinId: String = "METAL",      // aspecto de la app (ver ui/Theme.kt)
+    val skinId: String = "XENO",       // aspecto de la app (ver ui/Theme.kt)
     val accent1: Int = 0,              // color de acento principal (ARGB); 0 = el de la skin
     val accent2: Int = 0,              // color de acento secundario (ARGB); 0 = el de la skin
     val corners: Int = 0,              // 0 = según skin, 1 = cortadas, 2 = redondeadas
@@ -322,7 +322,7 @@ object EqRepository {
                     enabled = o.optBoolean("enabled", true),
                     globalMode = o.optBoolean("globalMode", false),
                     testerMode = o.optBoolean("tester", false),
-                    skinId = o.optString("skin", "METAL"),
+                    skinId = o.optString("skin", "XENO"),
                     accent1 = o.optInt("accent1", 0),
                     accent2 = o.optInt("accent2", 0),
                     corners = o.optInt("corners", 0),

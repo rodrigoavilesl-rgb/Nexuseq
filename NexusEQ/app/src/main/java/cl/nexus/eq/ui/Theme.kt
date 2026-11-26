@@ -124,6 +124,17 @@ object Skins {
         ok = Color(0xFF4CD964), warn = Color(0xFFFFCC00), cornerDp = 5, cut = true,
     )
 
+    // XENO: interfaz bioluminiscente de nave alienígena. Fondo abisal, acentos de plasma verde y violeta,
+    // esquinas cortadas profundas y tonos de "ámbar biológico" para alertas.
+    val XENO = Skin(
+        id = "XENO", name = "XENO", group = G_ALIEN,
+        bg = Color(0xFF02060A), panel = Color(0xFF07131A), panelHi = Color(0xFF0C1F29),
+        line = Color(0xFF1B4550), steel = Color(0xFF5FA8A0), chrome = Color(0xFFD7FFF4),
+        text = Color(0xFFE6FFF8), dim = Color(0xFF4E8C86),
+        accent1 = Color(0xFF39FFB4), accent2 = Color(0xFFB36BFF), hot = Color(0xFFFF4D6D),
+        ok = Color(0xFF7CFFCB), warn = Color(0xFFFFB86B), cornerDp = 26, cut = true,
+    )
+
     // ── ESTILO REPRODUCTOR: paletas y formas inspiradas en los reproductores más usados ──
     val LED = Skin(
         id = "LED", name = "CLÁSICO LED", group = G_PLAYER,
@@ -171,12 +182,15 @@ object Skins {
         ok = Color(0xFFA6FF00), warn = Color(0xFFFFD60A), cornerDp = 24, cut = false,
     )
 
-    val ALL = listOf(METAL, NEON, RETRO, ICE, XEL, COLMENA, ACERO, LED, STREAM, PULSO, AUDIOFILO, SPORT, WATCH)
+    val ALL = listOf(METAL, NEON, RETRO, ICE, XENO, XEL, COLMENA, ACERO, LED, STREAM, PULSO, AUDIOFILO, SPORT, WATCH)
+
+    /** Aspecto por defecto de la app (instalaciones nuevas). */
+    val DEFAULT = XENO
 
     /** Skins por grupo, en orden de aparición. */
     val GROUPS: Map<String, List<Skin>> get() = ALL.groupBy { it.group }
 
-    fun byId(id: String): Skin = ALL.firstOrNull { it.id == id } ?: METAL
+    fun byId(id: String): Skin = ALL.firstOrNull { it.id == id } ?: DEFAULT
 
     /** Skin base + los acentos y el estilo de esquinas que eligió el usuario (0 = valor de la skin). */
     fun resolve(id: String, accent1: Int, accent2: Int, corners: Int): Skin {
@@ -203,7 +217,7 @@ object Skins {
  * `Neon.Cyan`, etc. se actualiza solo cuando cambia la skin. Los nombres históricos se mantienen.
  */
 object Neon {
-    var skin: Skin by mutableStateOf(Skins.METAL)
+    var skin: Skin by mutableStateOf(Skins.DEFAULT)
 
     val Bg: Color get() = skin.bg
     val Panel: Color get() = skin.panel
