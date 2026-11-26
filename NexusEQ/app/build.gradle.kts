@@ -8,7 +8,8 @@ android {
     namespace = "cl.nexus.eq"
     compileSdk = 35
     defaultConfig {
-        applicationId = "cl.nexus.eq"
+        // Prueba: id distinto para no chocar con instalaciones previas (firma o residuos).
+        applicationId = "cl.nexus.eq.dev"
         minSdk = 28          // DynamicsProcessing requiere Android 9+
         targetSdk = 35
         versionCode = 3
